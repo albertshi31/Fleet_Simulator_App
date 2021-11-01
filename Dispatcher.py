@@ -5,6 +5,7 @@ import requests
 import time
 from geopy.distance import distance
 import json
+import os
 
 class Dispatcher:
     def __init__(self):
@@ -134,7 +135,9 @@ class Dispatcher:
         total_passengers = 0
         served_passengers = 0
         time_sec = 0
-        with open("Fleet_Simulator_App/static/depotmatrix.csv", "r") as f:
+        THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
+        my_file = os.path.join(THIS_FOLDER, "static", "depotmatrix.csv")
+        with open(my_file, "r") as f:
             matrix = json.load(f)
         trips = []
         metric_animations = {"NumOfActiveVehicles": [], "NumOfActivePassengers": [], "AVO": []}

@@ -4,7 +4,10 @@ import os
 
 from Dispatcher import Dispatcher
 
-app = Flask("__main__")
+global THIS_FOLDER
+THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask("__main__", template_folder=os.path.join(THIS_FOLDER, "templates"))
 
 global trips
 global metrics
@@ -16,7 +19,7 @@ global loop_length
 @app.route("/setup")
 def setup():
     print("CWD:", os.getcwd())
-    html = render_template("Fleet_Simulator_App/templates/setup.html")
+    html = render_template("setup.html")
     response = make_response(html)
     return response
 
@@ -28,15 +31,21 @@ def create_animation():
     global metric_animations
     global buildings
     global loop_length
+    global THIS_FOLDER
     fleetsize = int(request.args.get('fleetsize'))
     modesplit = int(request.args.get('modesplit'))
     aDispatcher = Dispatcher()
-    aDispatcher.createDataFeed("Fleet_Simulator_App/static/Trenton_AV_Station.csv", ["Fleet_Simulator_App/static/FinalOriginPixel34021_1.csv", "Fleet_Simulator_App/static/FinalOriginPixel34021_2.csv"], 40.194431, 40.259060, -74.808413, -74.720080, modesplit)
+    csv1 = os.path.join(THIS_FOLDER, "static", "Trenton_AV_Station.csv")
+    csv2 = os.path.join(THIS_FOLDER, "static", "FinalOriginPixel34021_1.csv")
+    csv3 = os.path.join(THIS_FOLDER, "static", "FinalOriginPixel34021_2.csv")
+
+    aDispatcher.createDataFeed(csv1, [csv2, csv3], 40.194431, 40.259060, -74.808413, -74.720080, modesplit)
     aDispatcher.createNumVehicles(fleetsize)
     trips, metrics, metric_animations, loop_length, run_time = aDispatcher.solve()
-    with open("Fleet_Simulator_App/static/depotbuildings.csv", "r") as f:
+    csv4 = os.path.join(THIS_FOLDER, "static", "depotbuildings.csv")
+    with open(csv4, "r") as f:
         buildings = json.load(f)
-    html = render_template("Fleet_Simulator_App/templates/create_animation.html", run_time = run_time)
+    html = render_template("create_animation.html", run_time = run_time)
     response = make_response(html)
     return response
 
@@ -47,7 +56,7 @@ def my_index():
     global metric_animations
     global buildings
     global loop_length
-    html = render_template("Fleet_Simulator_App/templates/index.html", buildings=buildings, trips = json.loads(trips), metric_animations = json.loads(metric_animations), loop_length = loop_length)
+    html = render_template("index.html", buildings=buildings, trips = json.loads(trips), metric_animations = json.loads(metric_animations), loop_length = loop_length)
     response = make_response(html)
     return response
 
@@ -55,6 +64,8 @@ def my_index():
 @app.route("/graphs")
 def graph_page():
     global metrics
-    html = render_template("Fleet_Simulator_App/templates/graphs.html", metrics = json.loads(metrics))
+    html = render_template("graphs.html", metrics = json.loads(metrics))
     response = make_response(html)
     return response
+
+app.run()
