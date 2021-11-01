@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Graph Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.4.2.min.js"></script>
+    <script type="text/javascript">
+      const METRICS = {{metrics|tojson}};
+    </script>
+  </head>
+  <body>
+    <a href="/animation">Go to Animation</a>
+    <div id="WalkDistToOriginKioskHistogram" style="width:600px;height:250px;"></div>
+    <h3 id="TotalWalkDistToOriginKiosk"></h3>
+    <div id="WalkDistToDestKioskHistogram" style="width:600px;height:250px;"></div>
+    <h3 id="TotalWalkDistToDestKiosk"></h3>
+    <div id="RideDistIfTakenAloneHistogram" style="width:600px;height:250px;"></div>
+    <div id="RideDistInRideshareHistogram" style="width:600px;height:250px;"></div>
+    <div id="DifferenceInDistanceBetweenAloneAndRideshareHistogram" style="width:600px;height:250px;"></div>
+
+    <script>
+      ////
+      var walk_dist_to_origin_kiosk_histogram = {
+        x: METRICS["WalkDistToOriginKiosk"],
+        type: 'histogram',
+      };
+      var walk_dist_to_origin_kiosk_histogram_layout = {
+        title: "Passenger Walking Distance to Origin Kiosk",
+        xaxis: {title: "Distance (meters)"},
+        yaxis: {title: "Num of Passengers"}
+      }
+      var data = [walk_dist_to_origin_kiosk_histogram];
+      Plotly.newPlot('WalkDistToOriginKioskHistogram', data, walk_dist_to_origin_kiosk_histogram_layout);
+
+      var total_walk_dist_to_origin_kiosk = 0;
+      for (let i = 0; i < METRICS["WalkDistToOriginKiosk"].length; i++) {
+          total_walk_dist_to_origin_kiosk += METRICS["WalkDistToOriginKiosk"][i];
+      }
+      $('#TotalWalkDistToOriginKiosk').html("Sum of Passenger Walk Distances to Origin Kiosk: " + total_walk_dist_to_origin_kiosk.toFixed(2).toString() + " meters")
+
+      //////
+      var walk_dist_to_dest_kiosk_histogram = {
+        x: METRICS["WalkDistToDestKiosk"],
+        type: 'histogram',
+      };
+      var walk_dist_to_dest_kiosk_histogram_layout = {
+        title: "Passenger Walking Distance to Destination Kiosk",
+        xaxis: {title: "Distance (meters)"},
+        yaxis: {title: "Num of Passengers"}
+      }
+      var data = [walk_dist_to_dest_kiosk_histogram];
+      Plotly.newPlot('WalkDistToDestKioskHistogram', data, walk_dist_to_dest_kiosk_histogram_layout);
+
+      var total_walk_dist_to_dest_kiosk = 0;
+      for (let i = 0; i < METRICS["WalkDistToDestKiosk"].length; i++) {
+          total_walk_dist_to_dest_kiosk += METRICS["WalkDistToDestKiosk"][i];
+      }
+      $('#TotalWalkDistToDestKiosk').html("Sum of Passenger Walk Distances to Destination Kiosk: " + total_walk_dist_to_dest_kiosk.toFixed(2).toString() + " meters")
+
+      ////
+      var ride_dist_if_taken_alone_histogram = {
+        x: METRICS["RideDistIfTakenAlone"],
+        type: 'histogram',
+      };
+      var ride_dist_if_taken_alone_histogram_layout = {
+        title: "Passenger Ride Distance If Taken Alone",
+        xaxis: {title: "Distance (meters)"},
+        yaxis: {title: "Num of Passengers"}
+      }
+      var data = [ride_dist_if_taken_alone_histogram];
+      Plotly.newPlot('RideDistIfTakenAloneHistogram', data, ride_dist_if_taken_alone_histogram_layout);
+
+      /////
+      var ride_dist_in_rideshare_histogram = {
+        x: METRICS["RideDistInRideshare"],
+        type: 'histogram',
+      };
+      var ride_dist_in_rideshare_histogram_layout = {
+        title: "Passenger Ride Distance In Rideshare",
+        xaxis: {title: "Distance (meters)"},
+        yaxis: {title: "Num of Passengers"}
+      }
+      var data = [ride_dist_in_rideshare_histogram];
+      Plotly.newPlot('RideDistInRideshareHistogram', data, ride_dist_in_rideshare_histogram_layout);
+
+      /////
+      var difference_in_distance_between_alone_and_rideshare_histogram = {
+        x: METRICS["DifferenceInDistanceBetweenAloneAndRideshare"],
+        type: 'histogram',
+      };
+      var difference_in_distance_between_alone_and_rideshare_histogram_layout = {
+        title: "Difference in Distance Between Alone and Rideshare Rides",
+        xaxis: {title: "Distance (meters)"},
+        yaxis: {title: "Num of Passengers"}
+      }
+      var data = [walk_dist_to_dest_kiosk_histogram];
+      Plotly.newPlot('DifferenceInDistanceBetweenAloneAndRideshareHistogram', data, difference_in_distance_between_alone_and_rideshare_histogram_layout);
+
+
+    </script>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+  </body>
+</html>

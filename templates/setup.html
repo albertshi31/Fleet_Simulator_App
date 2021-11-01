@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Setup Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+  </head>
+  <body>
+    <form action="/create_animation" id="params">
+      <label for="fleetsize">Fleetsize:</label><br>
+      <input type="number" id="fleetsize" name="fleetsize" value=100 min=58>
+      <br>
+      <label for="modesplit">Mode-Split (%):</label><br>
+      <input type="number" id="modesplit" name="modesplit" value=100 min=0 max=100>
+      <br><br>
+      <input type="submit" value="Submit">
+    </form>
+
+    <script>
+      $("#params").submit(function() {
+        alert("Parameters submitted! Calculating...");
+      });
+    </script>
+  </body>
+</html>
