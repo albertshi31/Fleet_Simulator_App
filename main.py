@@ -67,5 +67,3 @@ def graph_page():
     html = render_template("graphs.html", metrics = json.loads(metrics))
     response = make_response(html)
     return response
-
-app.run()
