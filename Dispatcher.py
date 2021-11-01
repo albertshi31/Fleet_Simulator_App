@@ -2,7 +2,6 @@ from Passenger import Passenger
 from Vehicle import Vehicle
 from DataFeed import DataFeed
 import requests
-import polyline
 import time
 from geopy.distance import distance
 import json
