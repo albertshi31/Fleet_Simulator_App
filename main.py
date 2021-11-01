@@ -1,5 +1,6 @@
 from flask import Flask, render_template, make_response, request
 import json
+import os
 
 from Dispatcher import Dispatcher
 
@@ -14,6 +15,7 @@ global loop_length
 @app.route("/")
 @app.route("/setup")
 def setup():
+    print(os.getcwd())
     html = render_template("/home/glaniewski/Fleet_Simulator_App/templates/setup.html")
     response = make_response(html)
     return response
