@@ -134,7 +134,7 @@ class Dispatcher:
         total_passengers = 0
         served_passengers = 0
         time_sec = 0
-        with open("/home/glaniewski/Fleet_Simulator_App/static/depotmatrix.csv", "r") as f:
+        with open("Fleet_Simulator_App/static/depotmatrix.csv", "r") as f:
             matrix = json.load(f)
         trips = []
         metric_animations = {"NumOfActiveVehicles": [], "NumOfActivePassengers": [], "AVO": []}
