@@ -12,15 +12,31 @@
   </head>
   <body>
     <a href="/animation">Go to Animation</a>
-    <div id="WalkDistToOriginKioskHistogram" style="width:600px;height:250px;"></div>
+    <div id="AVO"></div>
+    <div id="WalkDistToOriginKioskHistogram"></div>
     <h3 id="TotalWalkDistToOriginKiosk"></h3>
-    <div id="WalkDistToDestKioskHistogram" style="width:600px;height:250px;"></div>
+    <div id="WalkDistToDestKioskHistogram"></div>
     <h3 id="TotalWalkDistToDestKiosk"></h3>
-    <div id="RideDistIfTakenAloneHistogram" style="width:600px;height:250px;"></div>
-    <div id="RideDistInRideshareHistogram" style="width:600px;height:250px;"></div>
-    <div id="DifferenceInDistanceBetweenAloneAndRideshareHistogram" style="width:600px;height:250px;"></div>
+    <div id="RideDistIfTakenAloneHistogram"></div>
+    <div id="RideDistInRideshareHistogram"></div>
+    <div id="DifferenceInDistanceBetweenAloneAndRideshareHistogram"></div>
+
 
     <script>
+      var avo_scatterplot = {
+        x: [...Array(METRICS["AVO"].length).keys()],
+        y: METRICS["AVO"],
+        mode: 'lines+markers',
+        type: 'scatter'
+      };
+      var avo_scatterplot_layout = {
+        title: "AVO over Time",
+        xaxis: {title: "Time (seconds)"},
+        yaxis: {title: "Average Vehicle Occupancy (in passengers)"}
+      }
+      var data = [avo_scatterplot];
+      Plotly.newPlot('AVO', data, avo_scatterplot_layout);
+
       ////
       var walk_dist_to_origin_kiosk_histogram = {
         x: METRICS["WalkDistToOriginKiosk"],

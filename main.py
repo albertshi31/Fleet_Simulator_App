@@ -18,7 +18,6 @@ global loop_length
 @app.route("/")
 @app.route("/setup")
 def setup():
-    print("CWD:", os.getcwd())
     html = render_template("setup.html")
     response = make_response(html)
     return response
@@ -67,3 +66,6 @@ def graph_page():
     html = render_template("graphs.html", metrics = json.loads(metrics))
     response = make_response(html)
     return response
+
+#Remove before updating PythonAnywhere
+app.run()

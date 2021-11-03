@@ -7,8 +7,12 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
   </head>
   <body>
-    The tool completed its run in {{run_time}} seconds. <br>
-    <a href="/animation">Animation</a><br>
-    <a href="/graphs">Graphs</a>
+     <div id="runtime"></div>
+     <a href="/animation">Animation</a><br>
+     <a href="/graphs">Graphs</a>
   </body>
+  <script>
+    var runtime = {{run_time}};
+    $("#runtime").html("The tool completed its run in " + runtime.toFixed(2).toString() + " seconds.");
+  </script>
 </html>
