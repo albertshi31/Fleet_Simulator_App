@@ -14,6 +14,9 @@ class Depot:
     def addVehicle(self, aVehicle):
         self.lst_vehicles.append(aVehicle)
 
+    def removeVehicle(self, aVehicle):
+        self.lst_vehicles.remove(aVehicle)
+
     def addPassenger(self, aPassenger):
         self.lst_passengers.append(aPassenger)
 

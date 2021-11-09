@@ -86,10 +86,12 @@ class Dispatcher:
         closest_depot = self.DataFeed.all_depots[lst_distances.index(min(lst_distances))]
         return closest_depot
 
-    def routeVehicle(self, starting_depot, passengers, matrix, start_time, total_num_passengers, trips, num_active_passengers_decreases_over_time):
+    def routeVehicle(self, starting_depot, passengers, ending_depot, matrix, start_time, total_num_passengers, trips, num_active_passengers_decreases_over_time):
         lst_locations = list(set([pax.dest_depot for pax in passengers]))
         lst_locations.insert(0, starting_depot)
-        lst_locations.append(starting_depot)
+        if ending_depot:
+            lst_locations.append(ending_depot)
+            print("THIS MEANS REPOSITIONING IS HAPPENING")
         trip_latlngs = []
         distances = {}
         trip_distance = 0
@@ -131,7 +133,7 @@ class Dispatcher:
             pax.distance_in_rideshare = distances["{},{}".format(pax.dest_depot.lat, pax.dest_depot.lon)]
             pax.distance_if_taken_alone = matrix["{},{};{},{}".format(starting_depot.lat, starting_depot.lon, pax.dest_depot.lat, pax.dest_depot.lon)]["route_distance"]
             #assert (pax.distance_if_taken_alone <= pax.distance_in_rideshare) FIGURE OUT WHY THIS ISN'T WORKING
-        return trip_duration
+        return trip_duration, lst_locations[-1]
 
 
 
@@ -161,6 +163,9 @@ class Dispatcher:
         with open(my_file, "r") as f:
             matrix = json.load(f)
         trips = []
+        depot_locations = []
+        waiting_passengers = []
+        waiting_vehicles = []
         num_active_passengers_decreases_over_time = {}
         metric_animations = {"NumOfActiveVehicles": [], "NumOfActivePassengers": [], "AVO": [], "PassengersLeft": []}
         metrics = {"WalkDistToOriginKiosk": [], "WalkDistToDestKiosk": [], "RideDistIfTakenAlone": [], "RideDistInRideshare": [], "DifferenceInDistanceBetweenAloneAndRideshare": [], "AVO": []}
@@ -172,6 +177,8 @@ class Dispatcher:
         num_active_vehicles = 0
         num_active_passengers = 0
         passengers_left = 0
+
+        kiosks_havent_received_repositioned_vehicles = []
 
         while served_passengers < total_passengers or time_sec < accepting_passengers_until_time_sec or time_sec < last_arrival_at_depot_time + 1:
             # Assign riders to closest depots
@@ -189,6 +196,9 @@ class Dispatcher:
                     metrics["WalkDistToDestKiosk"].append(1.2*distance((pax.dest_lat, pax.dest_lon), (dDepot.lat, dDepot.lon)).meters)
 
 
+            if time_sec % leave_after_wait_time_sec == 0: # FIX NUMBER
+                kiosks_havent_received_repositioned_vehicles = self.DataFeed.all_depots[:]
+                print("REFRESH:", len(kiosks_havent_received_repositioned_vehicles))
 
             # Assign riders to vehicles
             for vehicle in self.all_vehicle_list:
@@ -196,6 +206,7 @@ class Dispatcher:
                 if vehicle.active == True:
                     if vehicle.arrival_at_depot_time == time_sec:
                         vehicle.active = False
+                        vehicle.depot.addVehicle(vehicle)
                         num_active_vehicles -= 1
                         continue
                 # If vehicle is currently waiting at home depot
@@ -204,7 +215,7 @@ class Dispatcher:
                     if len(depot.lst_passengers) >= max_capacity:
                         # NEED TO REMOVE PASSENGER AT EACH COUNT, PLACE ANIMATION THAT SHOWS PASSENGER EXITS
                         passengers = depot.lst_passengers[:max_capacity]
-                        trip_duration = self.routeVehicle(depot, passengers, matrix, time_sec, max_capacity, trips, num_active_passengers_decreases_over_time)
+                        trip_duration, last_depot = self.routeVehicle(depot, passengers, None, matrix, time_sec, max_capacity, trips, num_active_passengers_decreases_over_time)
                         for pax in passengers:
                             metrics["RideDistIfTakenAlone"].append(pax.distance_if_taken_alone)
                             metrics["RideDistInRideshare"].append(pax.distance_in_rideshare)
@@ -213,6 +224,8 @@ class Dispatcher:
                         vehicle.arrival_at_depot_time = time_sec + int(trip_duration)
                         depot.lst_passengers = depot.lst_passengers[max_capacity:]
                         vehicle.active = True
+                        vehicle.depot.removeVehicle(vehicle)
+                        vehicle.depot = last_depot
                         num_active_vehicles += 1
                         num_active_passengers += max_capacity
                         served_passengers += max_capacity
@@ -222,7 +235,7 @@ class Dispatcher:
                         if (time_sec - depot.lst_passengers[0].departure_time) >= max_wait_time_sec:
                             num_passengers = len(depot.lst_passengers)
                             passengers = depot.lst_passengers[:num_passengers]
-                            trip_duration = self.routeVehicle(depot, passengers, matrix, time_sec, num_passengers, trips, num_active_passengers_decreases_over_time)
+                            trip_duration, last_depot = self.routeVehicle(depot, passengers, None, matrix, time_sec, num_passengers, trips, num_active_passengers_decreases_over_time)
                             for pax in passengers:
                                 metrics["RideDistIfTakenAlone"].append(pax.distance_if_taken_alone)
                                 metrics["RideDistInRideshare"].append(pax.distance_in_rideshare)
@@ -231,11 +244,31 @@ class Dispatcher:
                             vehicle.arrival_at_depot_time = time_sec + int(trip_duration)
                             depot.lst_passengers = depot.lst_passengers[num_passengers:]
                             vehicle.active = True
+                            vehicle.depot.removeVehicle(vehicle)
+                            vehicle.depot = last_depot
                             num_active_vehicles += 1
                             num_active_passengers += num_passengers
                             served_passengers += num_passengers
                             last_arrival_at_depot_time = max(last_arrival_at_depot_time, vehicle.arrival_at_depot_time)
+                    else: # Empty vehicle repositioning
+                        number_of_waiting_passengers_at_each_depot = [len(depot.lst_passengers) for depot in kiosks_havent_received_repositioned_vehicles]
+                        depot_with_most_waiting_passengers = kiosks_havent_received_repositioned_vehicles[number_of_waiting_passengers_at_each_depot.index(max(number_of_waiting_passengers_at_each_depot))]
+                        if max(number_of_waiting_passengers_at_each_depot) > len(depot_with_most_waiting_passengers.lst_vehicles)*max_capacity: # FIX NUMBER
+                            kiosks_havent_received_repositioned_vehicles.remove(depot_with_most_waiting_passengers)
+                            print(len(kiosks_havent_received_repositioned_vehicles))
+                            trip_duration, last_depot = self.routeVehicle(depot, [], depot_with_most_waiting_passengers, matrix, time_sec, 0, trips, num_active_passengers_decreases_over_time)
+                            vehicle.num_passengers = 0
+                            vehicle.arrival_at_depot_time = time_sec + int(trip_duration)
+                            vehicle.active = True
+                            vehicle.depot.removeVehicle(vehicle)
+                            vehicle.depot = last_depot
+                            num_active_vehicles += 1
+                            num_active_passengers += 0
+                            served_passengers += 0
+                            last_arrival_at_depot_time = max(last_arrival_at_depot_time, vehicle.arrival_at_depot_time)
 
+            waiting_passengers_for_this_time_frame = []
+            waiting_vehicles_for_this_time_frame = []
             # Check all depots for waiting passengers
             for depot in self.DataFeed.all_depots:
                 for pax in depot.lst_passengers:
@@ -246,6 +279,12 @@ class Dispatcher:
                         passengers_left += 1
                         # Add passenger leaving animation to Trips Layer
                         trips.append({"vendor": 5, "path": [[depot.lon, depot.lat], [depot.lon, depot.lat-0.004]], "timestamps": [time_sec, time_sec+60]})
+                # count number of passengers and vehicles still waiting at this depot
+                waiting_passengers_for_this_time_frame.append({"coordinates": [depot.lon, depot.lat], "number": str(len(depot.lst_passengers))})
+                waiting_vehicles_for_this_time_frame.append({"coordinates": [depot.lon, depot.lat], "number": str(len(depot.lst_vehicles))})
+
+            waiting_passengers.append(waiting_passengers_for_this_time_frame)
+            waiting_vehicles.append(waiting_vehicles_for_this_time_frame)
 
 
             metric_animations["NumOfActiveVehicles"].append(num_active_vehicles)
@@ -268,11 +307,8 @@ class Dispatcher:
             # print("TIME", time_sec)
             time_sec += 1
 
-        # with open("trips.csv", "w") as f:
-        #     json.dump(trips, f)
-        # with open("num_active_passengers_decreases_over_time.csv", "w") as f:
-        #     json.dump(num_active_passengers_decreases_over_time, f)
+        # Generate depot locations
+        for depot in self.DataFeed.all_depots:
+            depot_locations.append({"coordinates": [depot.lon, depot.lat]})
 
-
-
-        return json.dumps(trips), json.dumps(metrics), json.dumps(metric_animations), last_arrival_at_depot_time + 1, time.time() - start
+        return json.dumps(trips), json.dumps(depot_locations), json.dumps(waiting_passengers), json.dumps(waiting_vehicles), json.dumps(metrics), json.dumps(metric_animations), last_arrival_at_depot_time + 1, time.time() - start
