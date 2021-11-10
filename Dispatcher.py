@@ -172,7 +172,7 @@ class Dispatcher:
 
         last_arrival_at_depot_time = 0
 
-        accepting_passengers_until_time_sec = 5000
+        accepting_passengers_until_time_sec = 30000
 
         num_active_vehicles = 0
         num_active_passengers = 0
