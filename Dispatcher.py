@@ -172,7 +172,7 @@ class Dispatcher:
 
         last_arrival_at_depot_time = 0
 
-        accepting_passengers_until_time_sec = 30000
+        accepting_passengers_until_time_sec = 5000
 
         num_active_vehicles = 0
         num_active_passengers = 0
@@ -270,7 +270,7 @@ class Dispatcher:
             waiting_passengers_for_this_time_frame = []
             waiting_vehicles_for_this_time_frame = []
             # Check all depots for waiting passengers
-            for depot in self.DataFeed.all_depots:
+            for idx, depot in enumerate(self.DataFeed.all_depots):
                 for pax in depot.lst_passengers:
                     # Passengers begin leaving after very long wait time
                     if time_sec - pax.departure_time >= leave_after_wait_time_sec:
@@ -280,8 +280,8 @@ class Dispatcher:
                         # Add passenger leaving animation to Trips Layer
                         trips.append({"vendor": 5, "path": [[depot.lon, depot.lat], [depot.lon, depot.lat-0.004]], "timestamps": [time_sec, time_sec+60]})
                 # count number of passengers and vehicles still waiting at this depot
-                waiting_passengers_for_this_time_frame.append({"coordinates": [depot.lon, depot.lat], "number": str(len(depot.lst_passengers))})
-                waiting_vehicles_for_this_time_frame.append({"coordinates": [depot.lon, depot.lat], "number": str(len(depot.lst_vehicles))})
+                waiting_passengers_for_this_time_frame.append({"c": idx, "n": str(len(depot.lst_passengers))})
+                waiting_vehicles_for_this_time_frame.append({"c": idx, "n": str(len(depot.lst_vehicles))})
 
             waiting_passengers.append(waiting_passengers_for_this_time_frame)
             waiting_vehicles.append(waiting_vehicles_for_this_time_frame)
@@ -304,11 +304,44 @@ class Dispatcher:
 
             metric_animations["PassengersLeft"].append(passengers_left)
 
-            # print("TIME", time_sec)
+            if time_sec % 1000 == 0:
+                print("TIME", time_sec)
             time_sec += 1
 
         # Generate depot locations
         for depot in self.DataFeed.all_depots:
             depot_locations.append({"coordinates": [depot.lon, depot.lat]})
 
-        return json.dumps(trips), json.dumps(depot_locations), json.dumps(waiting_passengers), json.dumps(waiting_vehicles), json.dumps(metrics), json.dumps(metric_animations), last_arrival_at_depot_time + 1, time.time() - start
+        my_file = os.path.join(THIS_FOLDER, "static", "trips.csv")
+        with open(my_file, "w") as f:
+            json.dump(trips, f)
+
+        my_file = os.path.join(THIS_FOLDER, "static", "depot_locations.csv")
+        with open(my_file, "w") as f:
+            json.dump(depot_locations, f)
+
+        my_file = os.path.join(THIS_FOLDER, "static", "waiting_passengers.csv")
+        with open(my_file, "w") as f:
+            json.dump(waiting_passengers, f)
+
+        my_file = os.path.join(THIS_FOLDER, "static", "waiting_vehicles.csv")
+        with open(my_file, "w") as f:
+            json.dump(waiting_vehicles, f)
+
+        my_file = os.path.join(THIS_FOLDER, "static", "metrics.csv")
+        with open(my_file, "w") as f:
+            json.dump(metrics, f)
+
+        my_file = os.path.join(THIS_FOLDER, "static", "metric_animations.csv")
+        with open(my_file, "w") as f:
+            json.dump(metric_animations, f)
+
+        my_file = os.path.join(THIS_FOLDER, "static", "looplength.txt")
+        with open(my_file, "w") as f:
+            f.write(str(last_arrival_at_depot_time + 1))
+
+        my_file = os.path.join(THIS_FOLDER, "static", "runtime.txt")
+        with open(my_file, "w") as f:
+            f.write(str(time.time() - start))
+
+        #return json.dumps(trips), json.dumps(depot_locations), json.dumps(waiting_passengers), json.dumps(waiting_vehicles), json.dumps(metrics), json.dumps(metric_animations), last_arrival_at_depot_time + 1, time.time() - start
