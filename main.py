@@ -87,4 +87,4 @@ def graph_page():
     return response
 
 #Remove before updating PythonAnywhere
-app.run()
+# app.run()
