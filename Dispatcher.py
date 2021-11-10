@@ -91,7 +91,7 @@ class Dispatcher:
         lst_locations.insert(0, starting_depot)
         if ending_depot:
             lst_locations.append(ending_depot)
-            print("THIS MEANS REPOSITIONING IS HAPPENING")
+            #print("THIS MEANS REPOSITIONING IS HAPPENING")
         trip_latlngs = []
         distances = {}
         trip_distance = 0
@@ -198,7 +198,7 @@ class Dispatcher:
 
             if time_sec % leave_after_wait_time_sec == 0: # FIX NUMBER
                 kiosks_havent_received_repositioned_vehicles = self.DataFeed.all_depots[:]
-                print("REFRESH:", len(kiosks_havent_received_repositioned_vehicles))
+                #print("REFRESH:", len(kiosks_havent_received_repositioned_vehicles))
 
             # Assign riders to vehicles
             for vehicle in self.all_vehicle_list:
@@ -255,7 +255,7 @@ class Dispatcher:
                         depot_with_most_waiting_passengers = kiosks_havent_received_repositioned_vehicles[number_of_waiting_passengers_at_each_depot.index(max(number_of_waiting_passengers_at_each_depot))]
                         if max(number_of_waiting_passengers_at_each_depot) > len(depot_with_most_waiting_passengers.lst_vehicles)*max_capacity: # FIX NUMBER
                             kiosks_havent_received_repositioned_vehicles.remove(depot_with_most_waiting_passengers)
-                            print(len(kiosks_havent_received_repositioned_vehicles))
+                            #print(len(kiosks_havent_received_repositioned_vehicles))
                             trip_duration, last_depot = self.routeVehicle(depot, [], depot_with_most_waiting_passengers, matrix, time_sec, 0, trips, num_active_passengers_decreases_over_time)
                             vehicle.num_passengers = 0
                             vehicle.arrival_at_depot_time = time_sec + int(trip_duration)

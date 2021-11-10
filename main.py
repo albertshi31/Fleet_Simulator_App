@@ -64,7 +64,9 @@ def my_index():
     global metric_animations
     global buildings
     global loop_length
-    html = render_template("index.html", buildings=buildings, trips = json.loads(trips), depot_locations = json.loads(depot_locations), waiting_passengers = json.loads(waiting_passengers), waiting_vehicles = json.loads(waiting_vehicles), metric_animations = json.loads(metric_animations), loop_length = loop_length)
+    animation_speed = request.args.get('animation_speed', default = 1, type = int)
+    start_time = request.args.get('start_time', default = 0, type = int)
+    html = render_template("index.html", buildings=buildings, trips = json.loads(trips), depot_locations = json.loads(depot_locations), waiting_passengers = json.loads(waiting_passengers), waiting_vehicles = json.loads(waiting_vehicles), metric_animations = json.loads(metric_animations), loop_length = loop_length, animation_speed=animation_speed, start_time=start_time,)
     response = make_response(html)
     return response
 
@@ -77,4 +79,4 @@ def graph_page():
     return response
 
 #Remove before updating PythonAnywhere
-#app.run()
+app.run()
