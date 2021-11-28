@@ -8,10 +8,13 @@
     <script src="https://cdn.plot.ly/plotly-2.4.2.min.js"></script>
     <script type="text/javascript">
       const METRICS = {{metrics|tojson}};
+      const PAX_LEFT_VS_FLEETSIZE_DATA = {{pax_left_vs_fleetsize_data}};
     </script>
   </head>
   <body>
     <a href="/animation">Go to Animation</a>
+    <h4>Angry passengers are passengers that leave after waiting 20 minutes without being picked up.</h4>
+    <div id="PassengersLeftVsFleetsize"></div>
     <div id="PassengerWaitTimeHistogram"></div>
     <div id="AVO"></div>
     <div id="WalkDistToOriginKioskHistogram"></div>
@@ -24,6 +27,21 @@
 
 
     <script>
+      var pax_left_vs_fleetsize_scatterplot = {
+        x: PAX_LEFT_VS_FLEETSIZE_DATA[0],
+        y: PAX_LEFT_VS_FLEETSIZE_DATA[1],
+        mode: 'lines+markers',
+        type: 'scatter'
+      };
+      var avo_scatterplot_layout = {
+        title: "Angry Passengers vs Fleetsize",
+        xaxis: {title: "Fleetsize (# of vehicles)"},
+        yaxis: {title: "Angry Passengers"}
+      }
+      var data = [pax_left_vs_fleetsize_scatterplot];
+      Plotly.newPlot('PassengersLeftVsFleetsize', data, avo_scatterplot_layout);
+
+      ////
       var pax_wait_time_histogram = {
         x: METRICS["PassengerWaitTime"],
         type: 'histogram',

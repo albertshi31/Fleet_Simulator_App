@@ -29,13 +29,13 @@ def create_animation():
     csv3 = os.path.join(THIS_FOLDER, "static", "FinalOriginPixel34021_2.csv")
     lst_fleetsize = []
     lst_passengers_left = []
-    for fleetsize in range(50, 300, 10):
+    for fleetsize in range(100, 1000, 20):
         print("Fleetsize:", fleetsize)
         lst_fleetsize.append(fleetsize)
         aDispatcher = Dispatcher()
         aDispatcher.createDataFeed(csv1, [csv2, csv3], 40.194431, 40.259060, -74.808413, -74.720080, modesplit)
         aDispatcher.createNumVehicles(fleetsize)
-        passengers_left, trips, depot_locations, missed_passengers, waiting_passengers, waiting_vehicles, metrics, metric_animations, last_arrival_at_depot_time, looplength, runtime = aDispatcher.solve()
+        passengers_left, trips, depot_locations, missed_passengers, waiting, metrics, metric_animations, last_arrival_at_depot_time, looplength, runtime = aDispatcher.solve()
         lst_passengers_left.append(passengers_left)
         if passengers_left == 0:
             print("DONE, PRINTING RESULTS")
@@ -52,13 +52,9 @@ def create_animation():
             with open(my_file, "w") as f:
                 json.dump(missed_passengers, f)
 
-            my_file = os.path.join(THIS_FOLDER, "static", "waiting_passengers.json")
+            my_file = os.path.join(THIS_FOLDER, "static", "waiting.json")
             with open(my_file, "w") as f:
-                json.dump(waiting_passengers, f)
-
-            my_file = os.path.join(THIS_FOLDER, "static", "waiting_vehicles.json")
-            with open(my_file, "w") as f:
-                json.dump(waiting_vehicles, f)
+                json.dump(waiting, f)
 
             my_file = os.path.join(THIS_FOLDER, "static", "metrics.json")
             with open(my_file, "w") as f:
@@ -75,7 +71,12 @@ def create_animation():
             my_file = os.path.join(THIS_FOLDER, "static", "runtime.txt")
             with open(my_file, "w") as f:
                 f.write(str(runtime))
+
+            my_file = os.path.join(THIS_FOLDER, "static", "pax_left_vs_fleetsize.txt")
+            with open(my_file, "w") as f:
+                f.write(str([lst_fleetsize, lst_passengers_left]))
             break
+
     print(lst_passengers_left)
     html = render_template("create_animation.html", run_time = time.time() - start)
     response = make_response(html)
@@ -104,13 +105,9 @@ def my_index():
     with open(my_file, "r") as f:
         missed_passengers = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "waiting_passengers.json")
+    my_file = os.path.join(THIS_FOLDER, "static", "waiting.json")
     with open(my_file, "r") as f:
-        waiting_passengers = json.load(f)
-
-    my_file = os.path.join(THIS_FOLDER, "static", "waiting_vehicles.json")
-    with open(my_file, "r") as f:
-        waiting_vehicles = json.load(f)
+        waiting = json.load(f)
 
     my_file = os.path.join(THIS_FOLDER, "static", "metric_animations.json")
     with open(my_file, "r") as f:
@@ -124,7 +121,7 @@ def my_index():
     with open(my_file, "r") as f:
         metrics = json.load(f)
 
-    html = render_template("index.html", buildings=buildings, trips = trips, depot_locations = depot_locations, missed_passengers = missed_passengers, waiting_passengers = waiting_passengers, waiting_vehicles = waiting_vehicles, metric_animations = metric_animations, loop_length = loop_length, animation_speed=animation_speed, start_time=start_time, metrics = metrics)
+    html = render_template("index.html", buildings=buildings, trips = trips, depot_locations = depot_locations, missed_passengers = missed_passengers, waiting = waiting, metric_animations = metric_animations, loop_length = loop_length, animation_speed=animation_speed, start_time=start_time, metrics = metrics)
     response = make_response(html)
     return response
 
@@ -135,7 +132,11 @@ def graph_page():
     with open(my_file, "r") as f:
         metrics = json.load(f)
 
-    html = render_template("graphs.html", metrics = metrics)
+    my_file = os.path.join(THIS_FOLDER, "static", "pax_left_vs_fleetsize.txt")
+    with open(my_file, "r") as f:
+        pax_left_vs_fleetsize_data = f.read()
+
+    html = render_template("graphs.html", metrics = metrics, pax_left_vs_fleetsize_data = pax_left_vs_fleetsize_data)
     response = make_response(html)
     return response
 
