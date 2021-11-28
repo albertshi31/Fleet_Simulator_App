@@ -12,6 +12,7 @@
   </head>
   <body>
     <a href="/animation">Go to Animation</a>
+    <div id="PassengerWaitTimeHistogram"></div>
     <div id="AVO"></div>
     <div id="WalkDistToOriginKioskHistogram"></div>
     <h3 id="TotalWalkDistToOriginKiosk"></h3>
@@ -23,6 +24,19 @@
 
 
     <script>
+      var pax_wait_time_histogram = {
+        x: METRICS["PassengerWaitTime"],
+        type: 'histogram',
+      };
+      var pax_wait_time_histogram_layout = {
+        title: "Passenger Wait Time",
+        xaxis: {title: "Time (seconds)"},
+        yaxis: {title: "Num of Passengers"}
+      }
+      var data = [pax_wait_time_histogram];
+      Plotly.newPlot('PassengerWaitTimeHistogram', data, pax_wait_time_histogram_layout);
+
+      ////
       var avo_scatterplot = {
         x: [...Array(METRICS["AVO"].length).keys()],
         y: METRICS["AVO"],
@@ -62,7 +76,7 @@
         type: 'histogram',
       };
       var walk_dist_to_dest_kiosk_histogram_layout = {
-        title: "Passenger Walking Distance to Destination Kiosk",
+        title: "Passenger Walking Distance from Destination Kiosk",
         xaxis: {title: "Distance (meters)"},
         yaxis: {title: "Num of Passengers"}
       }
@@ -73,7 +87,7 @@
       for (let i = 0; i < METRICS["WalkDistToDestKiosk"].length; i++) {
           total_walk_dist_to_dest_kiosk += METRICS["WalkDistToDestKiosk"][i];
       }
-      $('#TotalWalkDistToDestKiosk').html("Sum of Passenger Walk Distances to Destination Kiosk: " + total_walk_dist_to_dest_kiosk.toFixed(2).toString() + " meters")
+      $('#TotalWalkDistToDestKiosk').html("Sum of Passenger Walk Distances from Destination Kiosk: " + total_walk_dist_to_dest_kiosk.toFixed(2).toString() + " meters")
 
       ////
       var ride_dist_if_taken_alone_histogram = {
