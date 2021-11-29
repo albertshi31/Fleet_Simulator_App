@@ -29,17 +29,28 @@ def create_animation():
     csv3 = os.path.join(THIS_FOLDER, "static", "FinalOriginPixel34021_2.csv")
     lst_fleetsize = []
     lst_passengers_left = []
-    for fleetsize in range(100, 1000, 20):
+    aDispatcher = Dispatcher()
+    aDispatcher.createDataFeed(csv1, [csv2, csv3], 40.194431, 40.259060, -74.808413, -74.720080, modesplit)
+
+    for fleetsize in range(100, 300, 20):
         print("Fleetsize:", fleetsize)
         lst_fleetsize.append(fleetsize)
-        aDispatcher = Dispatcher()
-        aDispatcher.createDataFeed(csv1, [csv2, csv3], 40.194431, 40.259060, -74.808413, -74.720080, modesplit)
+        aDispatcher.resetDataFeed()
         aDispatcher.createNumVehicles(fleetsize)
-        passengers_left, trips, depot_locations, missed_passengers, waiting, metrics, metric_animations, last_arrival_at_depot_time, looplength, runtime = aDispatcher.solve()
+        index_metrics, trips, depot_locations, missed_passengers, waiting, metrics, metric_animations, last_arrival_at_depot_time, looplength, runtime = aDispatcher.solve()
+        passengers_left = index_metrics[1]
         lst_passengers_left.append(passengers_left)
         if passengers_left == 0:
             print("DONE, PRINTING RESULTS")
             # Write to files
+            my_file = os.path.join(THIS_FOLDER, "static", "index_metrics.txt")
+            with open(my_file, "w") as f:
+                f.write(str(index_metrics))
+
+            my_file = os.path.join(THIS_FOLDER, "static", "looplength.txt")
+            with open(my_file, "w") as f:
+                f.write(str(looplength))
+
             my_file = os.path.join(THIS_FOLDER, "static", "trips.json")
             with open(my_file, "w") as f:
                 json.dump(trips, f)
@@ -75,6 +86,7 @@ def create_animation():
             my_file = os.path.join(THIS_FOLDER, "static", "pax_left_vs_fleetsize.txt")
             with open(my_file, "w") as f:
                 f.write(str([lst_fleetsize, lst_passengers_left]))
+
             break
 
     print(lst_passengers_left)
@@ -117,11 +129,15 @@ def my_index():
     with open(my_file, "r") as f:
         loop_length = int(f.read())
 
+    my_file = os.path.join(THIS_FOLDER, "static", "index_metrics.txt")
+    with open(my_file, "r") as f:
+        index_metrics = f.read()
+
     my_file = os.path.join(THIS_FOLDER, "static", "metrics.json")
     with open(my_file, "r") as f:
         metrics = json.load(f)
 
-    html = render_template("index.html", buildings=buildings, trips = trips, depot_locations = depot_locations, missed_passengers = missed_passengers, waiting = waiting, metric_animations = metric_animations, loop_length = loop_length, animation_speed=animation_speed, start_time=start_time, metrics = metrics)
+    html = render_template("index.html", buildings=buildings, trips = trips, depot_locations = depot_locations, missed_passengers = missed_passengers, waiting = waiting, metric_animations = metric_animations, loop_length = loop_length, animation_speed=animation_speed, start_time=start_time, metrics = metrics, index_metrics = index_metrics)
     response = make_response(html)
     return response
 
@@ -141,4 +157,4 @@ def graph_page():
     return response
 
 #Remove before updating PythonAnywhere
-#app.run()
+app.run()

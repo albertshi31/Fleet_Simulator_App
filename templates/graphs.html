@@ -13,7 +13,7 @@
   </head>
   <body>
     <a href="/animation">Go to Animation</a>
-    <h4>Angry passengers are passengers that leave after waiting 20 minutes without being picked up.</h4>
+    <h4>Passengers Missed are passengers that leave after waiting 20 minutes without being picked up.</h4>
     <div id="PassengersLeftVsFleetsize"></div>
     <div id="PassengerWaitTimeHistogram"></div>
     <div id="AVO"></div>
@@ -34,9 +34,9 @@
         type: 'scatter'
       };
       var avo_scatterplot_layout = {
-        title: "Angry Passengers vs Fleetsize",
+        title: "Passengers Missed vs Fleetsize",
         xaxis: {title: "Fleetsize (# of vehicles)"},
-        yaxis: {title: "Angry Passengers"}
+        yaxis: {title: "# of Passengers Missed"}
       }
       var data = [pax_left_vs_fleetsize_scatterplot];
       Plotly.newPlot('PassengersLeftVsFleetsize', data, avo_scatterplot_layout);

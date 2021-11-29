@@ -63,13 +63,20 @@ class DataFeed:
                             self.all_passengers.append(newPassenger)
         # Sort passengers by departure_time
         self.all_passengers.sort(key=lambda pax: pax.departure_time)
-        self.remaining_passengers = self.all_passengers
+        self.remaining_passengers = self.all_passengers.copy()
 
     def getAllPassengers(self):
         return self.all_passengers
 
     def getLastPassengerTime(self):
         return self.all_passengers[-1].departure_time
+
+    def resetPassengerList(self):
+        self.remaining_passengers = self.all_passengers.copy()
+
+    def resetDepots(self):
+        for depot in self.all_depots:
+            depot.reset()
 
     def getRemainingPassengers(self, time):
         result = []

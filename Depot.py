@@ -26,3 +26,9 @@ class Depot:
     def getAnimationDetails(self):
         result = {'depot_idx': id(self), 'num_pax': len(self.lst_passengers)}
         return result
+
+    def reset(self):
+        self.lst_vehicles = []
+        self.lst_passengers = []
+        self.num_passengers = 0
+        self.max_passengers = 0

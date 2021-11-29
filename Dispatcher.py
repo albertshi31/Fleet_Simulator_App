@@ -6,6 +6,7 @@ import time
 from geopy.distance import distance
 import json
 import os
+import numpy as np
 
 class Dispatcher:
     def __init__(self):
@@ -29,6 +30,10 @@ class Dispatcher:
         self.DataFeed = DataFeed(depot_csv, lst_passenger_csv, min_lat, max_lat, min_lng, max_lng, modesplit)
         self.DataFeed.parsePassengers()
         self.DataFeed.parseDepots()
+
+    def resetDataFeed(self):
+        self.DataFeed.resetPassengerList()
+        self.DataFeed.resetDepots()
 
     def createNumVehicles(self, num_vehicles):
         self.all_vehicle_list = []
@@ -73,8 +78,9 @@ class Dispatcher:
             trip_latlngs = entry["route_latlngs"]
             trip_latlngs = [[elem[1], elem[0]] for elem in trip_latlngs] # DeckGL requires coords in (lon,lat) format
             trip_timestamps = [x+start_time+trip_duration for x in entry["timestamps"]]
+            trip_distance += entry["route_distance"]
             # Used for trips animations
-            new_entry = {"vendor": num_passengers, "path": trip_latlngs, "timestamps": trip_timestamps}
+            new_entry = {"vendor": num_passengers, "path": trip_latlngs, "timestamps": trip_timestamps, "distance": trip_distance}
             trips.append(new_entry)
 
             trip_duration += entry["route_duration"]
@@ -93,7 +99,6 @@ class Dispatcher:
             num_passengers -= num_passengers_exiting_vehicle_at_this_stop # Passenger(s) exit
 
             # Used for passenger metrics
-            trip_distance += entry["route_distance"]
             distances["{},{}".format(pair[1].lat, pair[1].lon)] = trip_distance
 
         assert (num_passengers == 0), "Vehicle should have droppped off all passengers"
@@ -278,4 +283,21 @@ class Dispatcher:
         for depot in self.DataFeed.all_depots:
             depot_locations["Coordinates"].append([depot.lon, depot.lat])
 
-        return passengers_left, trips, depot_locations, missed_passengers, waiting, metrics, metric_animations, last_arrival_at_depot_time, last_arrival_at_depot_time+1, time.time() - start
+        # Calculate metrics
+        num_total_vehicle_miles_traveled_miles = 0
+        num_empty_vehicle_miles_traveled = 0
+        for elem in trips:
+            distance_miles = elem["distance"] * 0.000621371192
+            num_total_vehicle_miles_traveled_miles += distance_miles
+            if elem["vendor"] == 0:
+                num_empty_vehicle_miles_traveled += distance_miles
+
+        arr_passenger_wait_time = metrics["PassengerWaitTime"]
+        avg_passenger_wait_time = np.average(arr_passenger_wait_time)
+        p90_passenger_wait_time = np.percentile(arr_passenger_wait_time, 90)
+        p99_passenger_wait_time = np.percentile(arr_passenger_wait_time, 99)
+        print(p90_passenger_wait_time, p99_passenger_wait_time, avg_passenger_wait_time)
+        print(passengers_left)
+        index_metrics = [served_passengers, passengers_left, num_total_vehicle_miles_traveled_miles, num_empty_vehicle_miles_traveled, avg_passenger_wait_time, p90_passenger_wait_time, p99_passenger_wait_time]
+
+        return index_metrics, trips, depot_locations, missed_passengers, waiting, metrics, metric_animations, last_arrival_at_depot_time, last_arrival_at_depot_time+1, time.time() - start
