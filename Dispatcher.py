@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 class Dispatcher:
-    def __init__(self):
+    def __init__(self, angry_passenger_threshold_sec):
         self.num_vehicles = 0
         self.all_vehicle_list = []
         self.active_vehicle_list = {}
@@ -25,6 +25,7 @@ class Dispatcher:
         self.time_rate = 1
         self.simulation_time_sec = 0
         self.active = False
+        self.leave_after_wait_time_sec = angry_passenger_threshold_sec
 
     def createDataFeed(self, depot_csv=None, lst_passenger_csv=None, min_lat=None, max_lat=None, min_lng=None, max_lng=None, modesplit=None):
         self.DataFeed = DataFeed(depot_csv, lst_passenger_csv, min_lat, max_lat, min_lng, max_lng, modesplit)
@@ -114,6 +115,7 @@ class Dispatcher:
 
     def solve(self):
         self.active = True
+
         # Allocate vehicles to depots
         num_depots = len(self.DataFeed.getDepots())
 
@@ -127,8 +129,6 @@ class Dispatcher:
 
         start = time.time()
 
-        max_wait_time_sec = 300
-        leave_after_wait_time_sec = 1200
         max_capacity = 4
         total_passengers = 0
         served_passengers = 0
@@ -138,7 +138,7 @@ class Dispatcher:
         with open(my_file, "r") as f:
             matrix = json.load(f)
         trips = []
-        depot_locations = {"Coordinates": []}
+        depot_locations = []
         missed_passengers = []
         waiting = []
         num_active_passengers_decreases_over_time = {}
@@ -207,7 +207,7 @@ class Dispatcher:
                         served_passengers += num_passengers_in_car
                         last_arrival_at_depot_time = max(last_arrival_at_depot_time, vehicle.arrival_at_depot_time)
                     else: # Empty vehicle repositioning, TODO: consider vehicles already in transit (ex: depot.lst_arriving_vehicles)
-                        if len(depot.lst_vehicles) > 2: # Make sure there not to take the depot's last remaining vehicle away
+                        if (time_sec < accepting_passengers_until_time_sec) and (len(depot.lst_vehicles) > 2): # Make sure there not to take the depot's last remaining vehicle away, make sure empty repositioning doesn't loop even after passengers stopped coming
                             number_of_waiting_passengers_at_each_depot = [len(depot.lst_passengers) for depot in kiosks_havent_received_repositioned_vehicles]
                             number_of_waiting_vehicles_at_each_depot = [len(depot.lst_vehicles) for depot in kiosks_havent_received_repositioned_vehicles]
                             depot_with_most_waiting_passengers = kiosks_havent_received_repositioned_vehicles[number_of_waiting_passengers_at_each_depot.index(max(number_of_waiting_passengers_at_each_depot))]
@@ -245,7 +245,7 @@ class Dispatcher:
             for idx, depot in enumerate(self.DataFeed.all_depots):
                 for pax in depot.lst_passengers:
                     # Passengers begin leaving after very long wait time
-                    if time_sec - pax.departure_time >= leave_after_wait_time_sec:
+                    if time_sec - pax.departure_time >= self.leave_after_wait_time_sec:
                         depot.lst_passengers = depot.lst_passengers[1:]
                         served_passengers += 1
                         passengers_left += 1
@@ -276,12 +276,12 @@ class Dispatcher:
             metric_animations["ServedPassengers"].append(served_passengers)
 
             if time_sec % 1000 == 0:
-                print("TIME", time_sec)
+                print("TIME", time_sec, "/", "~", accepting_passengers_until_time_sec)
             time_sec += 1
 
         # Generate depot locations
         for depot in self.DataFeed.all_depots:
-            depot_locations["Coordinates"].append([depot.lon, depot.lat])
+            depot_locations.append([depot.lon, depot.lat])
 
         # Calculate metrics
         num_total_vehicle_miles_traveled_miles = 0
@@ -296,8 +296,6 @@ class Dispatcher:
         avg_passenger_wait_time = np.average(arr_passenger_wait_time)
         p90_passenger_wait_time = np.percentile(arr_passenger_wait_time, 90)
         p99_passenger_wait_time = np.percentile(arr_passenger_wait_time, 99)
-        print(p90_passenger_wait_time, p99_passenger_wait_time, avg_passenger_wait_time)
-        print(passengers_left)
         index_metrics = [served_passengers, passengers_left, num_total_vehicle_miles_traveled_miles, num_empty_vehicle_miles_traveled, avg_passenger_wait_time, p90_passenger_wait_time, p99_passenger_wait_time]
 
         return index_metrics, trips, depot_locations, missed_passengers, waiting, metrics, metric_animations, last_arrival_at_depot_time, last_arrival_at_depot_time+1, time.time() - start
