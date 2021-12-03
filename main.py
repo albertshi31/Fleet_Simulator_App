@@ -8,6 +8,7 @@ from Dispatcher import Dispatcher
 global THIS_FOLDER
 THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
 global CITY_NAME
+CITY_NAME = ""
 
 app = Flask("__main__", template_folder=os.path.join(THIS_FOLDER, "templates"))
 
@@ -128,7 +129,7 @@ def create_animation():
 def my_index():
     global THIS_FOLDER
     global CITY_NAME
-    CITY_NAME = request.args.get('city_choice')
+    CITY_NAME = request.args.get('city_choice', default = CITY_NAME)
     animation_speed = request.args.get('animation_speed', default = 1, type = int)
     start_time = request.args.get('start_time', default = 0, type = int)
 
@@ -192,4 +193,4 @@ def graph_page():
     return response
 
 #Remove before updating PythonAnywhere
-#app.run()
+app.run()
