@@ -1,7 +1,5 @@
 # Ignore certain large csv files
-static/2020_OriginPixel34001_1.csv
-static/2020_OriginPixel34001_2.csv
-
+local_static/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
