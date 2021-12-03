@@ -88,3 +88,9 @@ class DataFeed:
         result = self.remaining_passengers[:idx]
         self.remaining_passengers = self.remaining_passengers[idx:]
         return result
+
+# a = DataFeed("local_static/Margate_City_AV_Station.csv", ['local_static/2020_OriginPixel34001_1.csv', 'local_static/2020_OriginPixel34001_2.csv'], 39.30302, 39.33865, -74.53923, -74.47335, float(100.0))
+# a.parseDepots()
+# a.parsePassengers()
+# print(a.getDepots())
+# print(len(a.getAllPassengers()))

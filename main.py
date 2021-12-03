@@ -7,10 +7,18 @@ from Dispatcher import Dispatcher
 
 global THIS_FOLDER
 THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
+global CITY_NAME
 
 app = Flask("__main__", template_folder=os.path.join(THIS_FOLDER, "templates"))
 
 @app.route("/")
+@app.route("/choose_city")
+def choosecity():
+    html = render_template("choose_city.html")
+    response = make_response(html)
+    return response
+
+
 @app.route("/setup")
 def setup():
     html = render_template("setup.html")
@@ -20,6 +28,8 @@ def setup():
 
 @app.route("/create_animation", methods=['GET'])
 def create_animation():
+    global CITY_NAME
+    CITY_NAME = request.args.get('city_name')
     depot_data_csv = request.args.get('depot_data_csv')
     lst_trip_data_csv = [string.strip() for string in request.args.get('lst_trip_data_csv').split(",")]
     lst_fleetsize = [int(num) for num in request.args.get('lst_fleetsize').split(",")]
@@ -32,14 +42,18 @@ def create_animation():
 
     start_time = time.time()
     global THIS_FOLDER
-    input_datafeed_depot_data = os.path.join(THIS_FOLDER, "static", depot_data_csv)
+    input_datafeed_depot_data = os.path.join(THIS_FOLDER, "local_static", depot_data_csv)
     input_datafeed_trip_data = []
     for trip_data_csv in lst_trip_data_csv:
-        input_datafeed_trip_data.append("static/" + trip_data_csv)
+        input_datafeed_trip_data.append("local_static/" + trip_data_csv)
+
+    print(input_datafeed_trip_data)
+    print("MODESPLIT:", modesplit)
+    print(min_lat, max_lat, min_lng, max_lng)
 
     lst_passengers_left = []
 
-    aDispatcher = Dispatcher(angry_passenger_threshold_sec)
+    aDispatcher = Dispatcher(CITY_NAME, angry_passenger_threshold_sec)
     aDispatcher.createDataFeed(input_datafeed_depot_data, input_datafeed_trip_data, min_lat, max_lat, min_lng, max_lng, modesplit)
 
     for idx, fleetsize in enumerate(lst_fleetsize):
@@ -53,52 +67,52 @@ def create_animation():
         if (passengers_left == 0) or (idx == len(lst_fleetsize)-1):
             print("DONE, PRINTING RESULTS")
             # Write to files
-            my_file = os.path.join(THIS_FOLDER, "static", "index_metrics.txt")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "index_metrics.txt")
             with open(my_file, "w") as f:
                 index_metrics.append(fleetsize)
                 f.write(str(index_metrics))
 
-            my_file = os.path.join(THIS_FOLDER, "static", "looplength.txt")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "looplength.txt")
             with open(my_file, "w") as f:
                 f.write(str(looplength))
 
-            my_file = os.path.join(THIS_FOLDER, "static", "trips.json")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "trips.json")
             with open(my_file, "w") as f:
                 json.dump(trips, f)
 
-            my_file = os.path.join(THIS_FOLDER, "static", "depot_locations.txt")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depot_locations.txt")
             with open(my_file, "w") as f:
                 f.write(str(depot_locations))
 
-            my_file = os.path.join(THIS_FOLDER, "static", "missed_passengers.json")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "missed_passengers.json")
             with open(my_file, "w") as f:
                 json.dump(missed_passengers, f)
 
-            my_file = os.path.join(THIS_FOLDER, "static", "waiting.json")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "waiting.json")
             with open(my_file, "w") as f:
                 json.dump(waiting, f)
 
-            my_file = os.path.join(THIS_FOLDER, "static", "metrics.json")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json")
             with open(my_file, "w") as f:
                 json.dump(metrics, f)
 
-            my_file = os.path.join(THIS_FOLDER, "static", "metric_animations.json")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metric_animations.json")
             with open(my_file, "w") as f:
                 json.dump(metric_animations, f)
 
-            my_file = os.path.join(THIS_FOLDER, "static", "looplength.txt")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "looplength.txt")
             with open(my_file, "w") as f:
                 f.write(str(looplength))
 
-            my_file = os.path.join(THIS_FOLDER, "static", "runtime.txt")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "runtime.txt")
             with open(my_file, "w") as f:
                 f.write(str(runtime))
 
-            my_file = os.path.join(THIS_FOLDER, "static", "pax_left_vs_fleetsize.txt")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "pax_left_vs_fleetsize.txt")
             with open(my_file, "w") as f:
                 f.write(str([lst_fleetsize, lst_passengers_left]))
 
-            my_file = os.path.join(THIS_FOLDER, "static", "viewstate_coordinates.txt")
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "viewstate_coordinates.txt")
             with open(my_file, "w") as f:
                 avg_lat = (min_lat + max_lat)/2
                 avg_lng = (min_lng + max_lng)/2
@@ -113,46 +127,48 @@ def create_animation():
 @app.route("/animation")
 def my_index():
     global THIS_FOLDER
+    global CITY_NAME
+    CITY_NAME = request.args.get('city_choice')
     animation_speed = request.args.get('animation_speed', default = 1, type = int)
     start_time = request.args.get('start_time', default = 0, type = int)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "depotbuildings.csv")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depotbuildings.csv")
     with open(my_file, "r") as f:
         buildings = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "trips.json")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "trips.json")
     with open(my_file, "r") as f:
         trips = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "depot_locations.txt")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depot_locations.txt")
     with open(my_file, "r") as f:
         depot_locations = f.read()
 
-    my_file = os.path.join(THIS_FOLDER, "static", "missed_passengers.json")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "missed_passengers.json")
     with open(my_file, "r") as f:
         missed_passengers = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "waiting.json")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "waiting.json")
     with open(my_file, "r") as f:
         waiting = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "metric_animations.json")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metric_animations.json")
     with open(my_file, "r") as f:
         metric_animations = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "looplength.txt")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "looplength.txt")
     with open(my_file, "r") as f:
         loop_length = int(f.read())
 
-    my_file = os.path.join(THIS_FOLDER, "static", "index_metrics.txt")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "index_metrics.txt")
     with open(my_file, "r") as f:
         index_metrics = f.read()
 
-    my_file = os.path.join(THIS_FOLDER, "static", "metrics.json")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json")
     with open(my_file, "r") as f:
         metrics = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "viewstate_coordinates.txt")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "viewstate_coordinates.txt")
     with open(my_file, "r") as f:
         viewstate_coordinates = f.read()
 
@@ -163,11 +179,11 @@ def my_index():
 
 @app.route("/graphs")
 def graph_page():
-    my_file = os.path.join(THIS_FOLDER, "static", "metrics.json")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json")
     with open(my_file, "r") as f:
         metrics = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", "pax_left_vs_fleetsize.txt")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "pax_left_vs_fleetsize.txt")
     with open(my_file, "r") as f:
         pax_left_vs_fleetsize_data = f.read()
 
@@ -176,4 +192,4 @@ def graph_page():
     return response
 
 #Remove before updating PythonAnywhere
-#app.run()
+app.run()

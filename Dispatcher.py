@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 class Dispatcher:
-    def __init__(self, angry_passenger_threshold_sec):
+    def __init__(self, city_name, angry_passenger_threshold_sec):
         self.num_vehicles = 0
         self.all_vehicle_list = []
         self.active_vehicle_list = {}
@@ -25,9 +25,11 @@ class Dispatcher:
         self.time_rate = 1
         self.simulation_time_sec = 0
         self.active = False
+        self.city_name = city_name
         self.leave_after_wait_time_sec = angry_passenger_threshold_sec
 
     def createDataFeed(self, depot_csv=None, lst_passenger_csv=None, min_lat=None, max_lat=None, min_lng=None, max_lng=None, modesplit=None):
+        print(lst_passenger_csv)
         self.DataFeed = DataFeed(depot_csv, lst_passenger_csv, min_lat, max_lat, min_lng, max_lng, modesplit)
         self.DataFeed.parsePassengers()
         self.DataFeed.parseDepots()
@@ -134,7 +136,7 @@ class Dispatcher:
         served_passengers = 0
         time_sec = 0
         THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
-        my_file = os.path.join(THIS_FOLDER, "static", "depotmatrix.csv")
+        my_file = os.path.join(THIS_FOLDER, "static", self.city_name, "depotmatrix.csv")
         with open(my_file, "r") as f:
             matrix = json.load(f)
         trips = []
