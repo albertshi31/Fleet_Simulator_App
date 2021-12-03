@@ -1,3 +1,22 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:ca3c17a621341b712979ddf2fe34edb147a2a115e0d103fd9d94028ec53e5fcc
-size 1060
+{
+  "files": {
+    "main.css": "/static/react/css/main.6dea0f05.chunk.css",
+    "main.js": "/static/react/js/main.a6de49ca.chunk.js",
+    "main.js.map": "/static/react/js/main.a6de49ca.chunk.js.map",
+    "runtime-main.js": "/static/react/js/runtime-main.d191b91c.js",
+    "runtime-main.js.map": "/static/react/js/runtime-main.d191b91c.js.map",
+    "js/2.fb1bda56.chunk.js": "/static/react/js/2.fb1bda56.chunk.js",
+    "js/2.fb1bda56.chunk.js.map": "/static/react/js/2.fb1bda56.chunk.js.map",
+    "js/3.bd12b4f6.chunk.js": "/static/react/js/3.bd12b4f6.chunk.js",
+    "js/3.bd12b4f6.chunk.js.map": "/static/react/js/3.bd12b4f6.chunk.js.map",
+    "../../templates/index.html": "/static/react/../../templates/index.html",
+    "css/main.6dea0f05.chunk.css.map": "/static/react/css/main.6dea0f05.chunk.css.map",
+    "js/2.fb1bda56.chunk.js.LICENSE.txt": "/static/react/js/2.fb1bda56.chunk.js.LICENSE.txt"
+  },
+  "entrypoints": [
+    "js/runtime-main.d191b91c.js",
+    "js/2.fb1bda56.chunk.js",
+    "css/main.6dea0f05.chunk.css",
+    "js/main.a6de49ca.chunk.js"
+  ]
+}
