@@ -60,11 +60,11 @@ class DepotMatrixAndBuildings:
                        [depot.lat+offset, depot.lon-offset],
                        [depot.lat-offset, depot.lon-offset]]
             polygon = [[elem[1], elem[0]] for elem in polygon]
-            buildings.append({"height": height, "polygon": polygon})
+            buildings.append({"height": height, "polygon": polygon, "m": str(depot)})
         with open("static/" + self.city_name + "/depotbuildings.csv", "w") as f:
             json.dump(buildings, f)
 
-a = DepotMatrixAndBuildings("local_static/Trenton_AV_Station.csv", "Trenton")
+a = DepotMatrixAndBuildings("local_static/Honolulu_AV_Station.csv", "Honolulu")
 a.createDepotMatrix()
 a.createDepotBuildings(50, 0.0002)
 

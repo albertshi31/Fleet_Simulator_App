@@ -1,5 +1,6 @@
 # Ignore certain large csv files
 local_static/
+static/Seattle
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
