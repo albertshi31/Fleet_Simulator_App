@@ -2,6 +2,7 @@ from flask import Flask, render_template, make_response, request, redirect, url_
 import json
 import os
 import time
+import compress_json
 
 from Dispatcher import Dispatcher
 
@@ -77,29 +78,24 @@ def create_animation():
             with open(my_file, "w") as f:
                 f.write(str(looplength))
 
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "trips.json")
-            with open(my_file, "w") as f:
-                json.dump(trips, f)
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "trips.json.gz")
+            compress_json.dump(trips, my_file)
 
             my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depot_locations.txt")
             with open(my_file, "w") as f:
                 f.write(str(depot_locations))
 
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "missed_passengers.json")
-            with open(my_file, "w") as f:
-                json.dump(missed_passengers, f)
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "missed_passengers.json.gz")
+            compress_json.dump(missed_passengers, my_file)
 
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "waiting.json")
-            with open(my_file, "w") as f:
-                json.dump(waiting, f)
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "waiting.json.gz")
+            compress_json.dump(waiting, my_file)
 
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json")
-            with open(my_file, "w") as f:
-                json.dump(metrics, f)
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json.gz")
+            compress_json.dump(metrics, my_file)
 
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metric_animations.json")
-            with open(my_file, "w") as f:
-                json.dump(metric_animations, f)
+            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metric_animations.json.gz")
+            compress_json.dump(metric_animations, my_file)
 
             my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "looplength.txt")
             with open(my_file, "w") as f:
@@ -137,25 +133,21 @@ def my_index():
     with open(my_file, "r") as f:
         buildings = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "trips.json")
-    with open(my_file, "r") as f:
-        trips = json.load(f)
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "trips.json.gz")
+    trips = compress_json.load(my_file)
 
     my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depot_locations.txt")
     with open(my_file, "r") as f:
         depot_locations = f.read()
 
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "missed_passengers.json")
-    with open(my_file, "r") as f:
-        missed_passengers = json.load(f)
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "missed_passengers.json.gz")
+    missed_passengers = compress_json.load(my_file)
 
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "waiting.json")
-    with open(my_file, "r") as f:
-        waiting = json.load(f)
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "waiting.json.gz")
+    waiting = compress_json.load(my_file)
 
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metric_animations.json")
-    with open(my_file, "r") as f:
-        metric_animations = json.load(f)
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metric_animations.json.gz")
+    metric_animations = compress_json.load(my_file)
 
     my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "looplength.txt")
     with open(my_file, "r") as f:
@@ -165,9 +157,8 @@ def my_index():
     with open(my_file, "r") as f:
         index_metrics = f.read()
 
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json")
-    with open(my_file, "r") as f:
-        metrics = json.load(f)
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json.gz")
+    metrics = compress_json.load(my_file)
 
     my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "viewstate_coordinates.txt")
     with open(my_file, "r") as f:
@@ -180,9 +171,8 @@ def my_index():
 
 @app.route("/graphs")
 def graph_page():
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json")
-    with open(my_file, "r") as f:
-        metrics = json.load(f)
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json.gz")
+    metrics = compress_json.load(my_file)
 
     my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "pax_left_vs_fleetsize.txt")
     with open(my_file, "r") as f:
@@ -193,4 +183,4 @@ def graph_page():
     return response
 
 #Remove before updating PythonAnywhere
-#app.run()
+app.run()
