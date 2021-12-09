@@ -61,6 +61,7 @@ class DataFeed:
                                                     departure_time,
                                                     random.choice([0, 1, 2]))
                             self.all_passengers.append(newPassenger)
+
         # Sort passengers by departure_time
         self.all_passengers.sort(key=lambda pax: pax.departure_time)
         self.remaining_passengers = self.all_passengers.copy()
