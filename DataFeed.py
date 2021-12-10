@@ -3,6 +3,9 @@ from Passenger import Passenger
 from Vehicle import Vehicle
 import csv
 import random
+import h3
+from geopy.distance import distance
+
 
 # Need to change to OFIPS instead of min/max lat/lon
 class DataFeed:
@@ -15,7 +18,11 @@ class DataFeed:
         self.max_lng = max_lng
         self.modesplit = modesplit
         self.all_depots = []
+        self.current_index_passenger_list = 0
         self.all_passengers = []
+        self.dict_h3_indices_depots = {}
+        self.STARTING_RESOLUTION = 10
+        self.SEARCH_RADIUS = 8
 
     def parseDepots(self):
         with open(self.depot_csv, 'r', encoding='utf-8-sig') as file:
@@ -25,8 +32,16 @@ class DataFeed:
             lat_idx = header.index("Lat")
             long_idx = header.index("Long")
             for row in csvreader:
-                newDepot = Depot(row[name_idx], row[lat_idx], row[long_idx])
+                lat = float(row[lat_idx])
+                long = float(row[long_idx])
+                newDepot = Depot(row[name_idx], lat, long)
                 self.all_depots.append(newDepot)
+                for resolution in range(self.STARTING_RESOLUTION, 4, -1):
+                    h3_index = h3.geo_to_h3(lat, long, resolution)
+                    if h3_index in self.dict_h3_indices_depots:
+                        self.dict_h3_indices_depots[h3_index].append(newDepot)
+                    else:
+                        self.dict_h3_indices_depots[h3_index] = [newDepot]
 
     def getDepots(self):
         return self.all_depots
@@ -60,6 +75,11 @@ class DataFeed:
                                                     dest_lng,
                                                     departure_time,
                                                     random.choice([0, 1, 2]))
+                            # for resolution in [8, 7, 6, 5]:
+                            #     h3_index_origin = h3.geo_to_h3(lat, lng, resolution)
+                            #     newPassenger.lst_h3_indices_origin.append(h3_index_origin)
+                            #     h3_index_destination = h3.geo_to_h3(lat, lng, resolution)
+                            #     newPassenger.lst_h3_indices_destination.append(h3_index_destination)
                             self.all_passengers.append(newPassenger)
 
         # Sort passengers by departure_time
@@ -81,17 +101,51 @@ class DataFeed:
 
     def getRemainingPassengers(self, time):
         result = []
-        idx = 0
-        for pax in self.remaining_passengers:
+        if time > self.all_passengers[-1].departure_time:
+            return result
+        start_index = self.current_index_passenger_list
+        advance_counter = 0
+        while(True):
+            if start_index + advance_counter == len(self.all_passengers):
+                break
+            pax = self.all_passengers[start_index + advance_counter]
             if pax.departure_time > time:
                 break
-            idx += 1
-        result = self.remaining_passengers[:idx]
-        self.remaining_passengers = self.remaining_passengers[idx:]
+            advance_counter += 1
+        self.current_index_passenger_list += advance_counter
+        result = self.all_passengers[start_index:start_index+advance_counter]
         return result
 
-# a = DataFeed("local_static/Margate_City_AV_Station.csv", ['local_static/2020_OriginPixel34001_1.csv', 'local_static/2020_OriginPixel34001_2.csv'], 39.30302, 39.33865, -74.53923, -74.47335, float(100.0))
-# a.parseDepots()
-# a.parsePassengers()
+
+    def getClosestDepot(self, lat, lon):
+        resolution = self.STARTING_RESOLUTION
+        while resolution > 4:
+            h3_index = h3.geo_to_h3(lat, lon, resolution)
+            if h3_index in self.dict_h3_indices_depots:
+                if len(self.dict_h3_indices_depots[h3_index]) == 1:
+                    return self.dict_h3_indices_depots[h3_index][0]
+                else:
+                    lst_distances = []
+                    for depot in self.dict_h3_indices_depots[h3_index]:
+                        lst_distances.append(distance((lat, lon), (depot.lat, depot.lon)).meters)
+                    closest_depot = self.dict_h3_indices_depots[h3_index][lst_distances.index(min(lst_distances))]
+                    return closest_depot
+            else:
+                resolution -= 1
+
+    def getNearbyDepots(self, lat, lon):
+        lst_nearby_depots = []
+        resolution = self.STARTING_RESOLUTION
+        h3_index = h3.geo_to_h3(lat, lon, resolution)
+        for idx in list(h3.k_ring(h3_index, self.SEARCH_RADIUS)):
+            if idx in self.dict_h3_indices_depots:
+                lst_nearby_depots.extend(self.dict_h3_indices_depots[idx])
+        return lst_nearby_depots
+
+
+a = DataFeed("local_static/Trenton_AV_Station.csv", ['local_static/2020_OriginPixel34021_1.csv', 'local_static/2020_OriginPixel34021_2.csv'], 40.1976591962, 40.2573225184, -74.7999188569, -74.734932536, float(100.0))
+a.parseDepots()
+#a.parsePassengers()
+#print(a.getClosestDepot(40.19865883770,-74.77))
 # print(a.getDepots())
-# print(len(a.getAllPassengers()))
+#print(len(a.getAllPassengers()))

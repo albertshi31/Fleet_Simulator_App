@@ -7,6 +7,8 @@ class Passenger:
         self.departure_time = departure_time
         self.vehicle_departure_time = None
         self.depot = None
+        # self.lst_h3_indices_origin = []
+        # self.lst_h3_indices_destination = []
         self.dest_depot = None
         self.active = True
         self.profile = int(profile)

@@ -4,6 +4,7 @@ class Depot:
         self.lat = float(lat)
         self.lon = float(lon)
         self.lst_vehicles = []
+        self.lst_incoming_vehicles = []
         self.lst_passengers = []
         self.num_passengers = 0
         self.max_passengers = 0

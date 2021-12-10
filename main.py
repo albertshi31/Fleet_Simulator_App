@@ -65,7 +65,7 @@ def create_animation():
         index_metrics, trips, depot_locations, missed_passengers, waiting, metrics, metric_animations, last_arrival_at_depot_time, looplength, runtime = aDispatcher.solve()
         passengers_left = index_metrics[1]
         lst_passengers_left.append(passengers_left)
-        print(passengers_left)
+        print("MISSED PASSENGERS:", passengers_left)
         if (passengers_left == 0) or (idx == len(lst_fleetsize)-1):
             print("DONE, PRINTING RESULTS")
             # Write to files
