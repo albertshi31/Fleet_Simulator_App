@@ -143,8 +143,8 @@ class DataFeed:
         return lst_nearby_depots
 
 
-a = DataFeed("local_static/Trenton_AV_Station.csv", ['local_static/2020_OriginPixel34021_1.csv', 'local_static/2020_OriginPixel34021_2.csv'], 40.1976591962, 40.2573225184, -74.7999188569, -74.734932536, float(100.0))
-a.parseDepots()
+#a = DataFeed("local_static/Trenton_AV_Station.csv", ['local_static/2020_OriginPixel34021_1.csv', 'local_static/2020_OriginPixel34021_2.csv'], 40.1976591962, 40.2573225184, -74.7999188569, -74.734932536, float(100.0))
+#a.parseDepots()
 #a.parsePassengers()
 #print(a.getClosestDepot(40.19865883770,-74.77))
 # print(a.getDepots())
