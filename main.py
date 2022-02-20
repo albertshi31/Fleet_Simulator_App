@@ -182,5 +182,5 @@ def graph_page():
     response = make_response(html)
     return response
 
-#Remove before updating PythonAnywhere
-app.run()
+#Comment out before updating PythonAnywhere
+#app.run()
