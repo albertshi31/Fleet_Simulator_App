@@ -166,7 +166,11 @@ class Dispatcher:
                 oDepot = self.DataFeed.getClosestDepot(pax.lat, pax.lon)
                 pax.depot = oDepot
                 dDepot = self.DataFeed.getClosestDepot(pax.dest_lat, pax.dest_lon)
+                # print(self.DataFeed.getClosestDepot(pax.dest_lat, pax.dest_lon))
                 pax.dest_depot = dDepot
+                # print("PASSENGER", pax, pax.lat, pax.lon, pax.dest_lat, pax.dest_lon)
+                # print("ODEPOT:", oDepot)
+                # print("DDEPOT:", dDepot)
                 if oDepot != dDepot:
                     oDepot.addPassenger(pax)
                     total_passengers += 1

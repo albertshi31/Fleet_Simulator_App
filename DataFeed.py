@@ -36,7 +36,7 @@ class DataFeed:
                 long = float(row[long_idx])
                 newDepot = Depot(row[name_idx], lat, long)
                 self.all_depots.append(newDepot)
-                for resolution in range(self.STARTING_RESOLUTION, 4, -1):
+                for resolution in range(self.STARTING_RESOLUTION, 0, -1):
                     h3_index = h3.geo_to_h3(lat, long, resolution)
                     if h3_index in self.dict_h3_indices_depots:
                         self.dict_h3_indices_depots[h3_index].append(newDepot)
@@ -119,17 +119,18 @@ class DataFeed:
 
     def getClosestDepot(self, lat, lon):
         resolution = self.STARTING_RESOLUTION
-        while resolution > 4:
+        while resolution > 0:
             h3_index = h3.geo_to_h3(lat, lon, resolution)
             if h3_index in self.dict_h3_indices_depots:
-                if len(self.dict_h3_indices_depots[h3_index]) == 1:
-                    return self.dict_h3_indices_depots[h3_index][0]
-                else:
-                    lst_distances = []
-                    for depot in self.dict_h3_indices_depots[h3_index]:
-                        lst_distances.append(distance((lat, lon), (depot.lat, depot.lon)).meters)
-                    closest_depot = self.dict_h3_indices_depots[h3_index][lst_distances.index(min(lst_distances))]
-                    return closest_depot
+                return self.dict_h3_indices_depots[h3_index][random.randint(0, len(self.dict_h3_indices_depots[h3_index])-1)]
+                # if len(self.dict_h3_indices_depots[h3_index]) == 1:
+                #     return self.dict_h3_indices_depots[h3_index][0]
+                # else:
+                #     lst_distances = []
+                #     for depot in self.dict_h3_indices_depots[h3_index]:
+                #         lst_distances.append(distance((lat, lon), (depot.lat, depot.lon)).meters)
+                #     closest_depot = self.dict_h3_indices_depots[h3_index][lst_distances.index(min(lst_distances))]
+                #     return closest_depot
             else:
                 resolution -= 1
 
@@ -143,9 +144,9 @@ class DataFeed:
         return lst_nearby_depots
 
 
-#a = DataFeed("local_static/Trenton_AV_Station.csv", ['local_static/2020_OriginPixel34021_1.csv', 'local_static/2020_OriginPixel34021_2.csv'], 40.1976591962, 40.2573225184, -74.7999188569, -74.734932536, float(100.0))
+#a = DataFeed("local_static/BQX_AV_Station.csv", ['local_static/2020_OriginPixel36061_1.csv', 'local_static/2020_OriginPixel36061_2.csv'], 40.670365, 40.780465, -74.01542, -73.906058, float(100.0))
 #a.parseDepots()
 #a.parsePassengers()
-#print(a.getClosestDepot(40.19865883770,-74.77))
+#print(a.getClosestDepot(40.777291299999995, -73.988512))
 # print(a.getDepots())
 #print(len(a.getAllPassengers()))
