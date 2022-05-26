@@ -122,6 +122,7 @@ class Dispatcher:
         # Allocate vehicles to depots
         num_depots = len(self.DataFeed.getDepots())
 
+        # ALlocate vehicles according to predicted future demand, instead of naive
         for idx, vehicle in enumerate(self.all_vehicle_list):
             depot = self.DataFeed.all_depots[idx % num_depots]
             depot.addVehicle(vehicle)
@@ -185,6 +186,7 @@ class Dispatcher:
             # Assign riders to vehicles
             for vehicle in self.all_vehicle_list:
                 # If vehicle has left home depot with passengers
+                # FIX: Have the vehicle pick up passengers along the way!
                 if vehicle.active == True:
                     if vehicle.arrival_at_depot_time == time_sec:
                         vehicle.active = False

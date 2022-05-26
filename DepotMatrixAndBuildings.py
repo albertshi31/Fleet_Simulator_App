@@ -64,7 +64,7 @@ class DepotMatrixAndBuildings:
         with open("static/" + self.city_name + "/depotbuildings.csv", "w") as f:
             json.dump(buildings, f)
 
-a = DepotMatrixAndBuildings("local_static/BQX_AV_Station.csv", "BQX")
+a = DepotMatrixAndBuildings("local_static/Jersey_City_AV_Station.csv", "Jersey_City")
 a.createDepotMatrix()
 a.createDepotBuildings(50, 0.0002)
 
