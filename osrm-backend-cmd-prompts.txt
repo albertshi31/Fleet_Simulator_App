@@ -9,4 +9,4 @@ Replace ${PWD} with %cd% on Windows
 Docker will try to find the data at %cd%/berlin-latest.osrm on the host
 
 
-docker run -t -i -p 5000:5000 -v "%cd%:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/new-jersey-latest.osrm
+docker run -t -i -p 5000:5000 -v "%cd%:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/new-york-latest.osrm
