@@ -183,4 +183,4 @@ def graph_page():
     return response
 
 #Comment out before updating PythonAnywhere
-#app.run()
+app.run()
