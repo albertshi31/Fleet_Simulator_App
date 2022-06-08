@@ -4,6 +4,9 @@ import json
 import os
 import time
 import compress_json
+import addfips
+from zipfile import ZipFile
+import csv
 
 from Dispatcher import Dispatcher
 
@@ -40,19 +43,37 @@ def setup_interactive():
     return response
 
 
-@app.route("/create_animation", methods=['GET'])
+@app.route("/create_animation", methods=['POST'])
 def create_animation():
     global CITY_NAME
     CITY_NAME = request.args.get('city_name')
-    depot_data_csv = request.args.get('depot_data_csv')
-    lst_trip_data_csv = [string.strip() for string in request.args.get('lst_trip_data_csv').split(",")]
-    lst_fleetsize = [int(num) for num in request.args.get('lst_fleetsize').split(",")]
-    modesplit = float(request.args.get('modesplit'))
-    min_lat = float(request.args.get('min_lat'))
-    max_lat = float(request.args.get('max_lat'))
-    min_lng = float(request.args.get('min_lng'))
-    max_lng = float(request.args.get('max_lng'))
-    angry_passenger_threshold_sec = int(request.args.get('angry_passenger_threshold_sec'))
+    county_name = request.args.get('county_name')
+    state_name = request.args.get('state_name')
+    url_path = request.args.get('url_path')
+    list_kiosks = request.args.get('list_kiosks').split(',')
+    list_kiosks = [[int(name), float(lat), float(lon)] for name, lat, lon in [list_kiosks[x:x+3] for x in range(0, len(list_kiosks), 3)]]
+    print(CITY_NAME, county_name, state_name, url_path, list_kiosks)
+
+    af = addfips.AddFIPS()
+    fips_code = af.get_county_fips(county_name, state=state_name)
+    global THIS_FOLDER
+    for filename in os.listdir(os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed")):
+        if state_name.replace(" ", "") in filename:
+            filepath = os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed", filename)
+            print(filepath)
+            with ZipFile(filepath, 'r') as f:
+                list_of_zipped_files = ZipFile.namelist(f)
+                list_of_files_to_unzip = [filename for filename in list_of_zipped_files if fips_code in filename]
+                f.extractall(os.path.join(THIS_FOLDER, "local_static"), members = list_of_files_to_unzip)
+            break
+
+    depot_data_filename = CITY_NAME+"_AV_STATION.csv"
+    fields = ["Name", "Lat", "Long"]
+    with open(os.path.join(THIS_FOLDER, "local_static", depot_data_filename), 'w') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(fields)
+        csvwriter.writerows(list_kiosks)
+
 
     start_time = time.time()
     global THIS_FOLDER
