@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Choose a City</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
+      integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ=="
+      crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"
+      integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ=="
+      crossorigin=""></script>
+
+    <!-- Showing Place Boundaries -->
+    <script src="https://api.jawg.io/libraries/jawg-places@latest/jawg-places.js?access-token={{jawg_accessToken}}"></script>
+
+     <style>
+       html, body {
+         margin: 0;
+       }
+      #map {
+          height: 100vh;
+          width: 100vw;
+          position: absolute;
+      }
+      #kiosks {
+        margin-left: 10px;
+        margin-top: 10px;
+        position: absolute;
+        background-color: rgba(255,255,255,0.5);
+        z-index: 1000;
+      }
+      .panel {
+          max-height: 50vh;
+          max-width: 30vw;
+          overflow: scroll;
+      }
+      </style>
+  </head>
+  <body>
+    <div id="map">
+    </div>
+    <div id="kiosks">
+      <label for="placeKiosksCheck">Place Kiosks?</label>
+      <input type="checkbox" id="placeKiosksCheck">
+      <div class="panel panel-default overflow-auto" id="listkiosks">
+        <div class="panel-heading">List of Kiosks</div>
+      </div>
+      <button onclick="submitKiosks()">Submit</button>
+    </div>
+
+
+    <script>
+      var mymap = L.map('map').setView([40.349193, -74.659288], 15);
+      mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+          attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+          id: 'mapbox/streets-v11',
+          accessToken: '{{mapbox_access_token}}'
+      }));
+
+      let jawgPlaces = new JawgPlaces.Leaflet({
+        searchOnTyping: true,
+        adminArea: {
+          outlineColor: 'rgb(172,59,246)',
+          show: true,
+        },
+        marker: {
+          show: false,
+        },
+        sources: 'wof',
+        onClick: (feature) => {
+          locality_gid = feature.properties.locality_gid.split(":")[2];
+          console.log(locality_gid);
+          url_path = locality_gid.match(/.{1,3}/g).join("/") + "/" + locality_gid + ".geojson";
+          console.log(url_path);
+        },
+        L: L,
+      });
+
+      mymap.addControl(jawgPlaces);
+
+      var list_kiosks = [];
+      function placeKiosk(e) {
+        if ($('#placeKiosksCheck').is(':checked')) {
+          var marker = L.marker(e.latlng).addTo(mymap);
+          var circle = L.circle(e.latlng, {
+              color: 'red',
+              fillColor: '#f03',
+              fillOpacity: 0.5,
+              radius: 402.336 // 0.25 miles in meters
+          }).addTo(mymap);
+          console.log(e.latlng);
+          list_kiosks.push([e.latlng.lat, e.latlng.lng]);
+          $("#listkiosks").append('<div class="panel-body">'+e.latlng+'</div>');
+        }
+      }
+
+      var request = null;
+      function submitKiosks() {
+        list_kiosks = encodeURIComponent(list_kiosks);
+        console.log(list_kiosks);
+      }
+
+      mymap.on('click', placeKiosk);
+
+      mymap.zoomControl.setPosition('bottomright');
+
+    </script>
+  </body>
+</html>

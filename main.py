@@ -1,4 +1,5 @@
 from flask import Flask, render_template, make_response, request, redirect, url_for
+import requests
 import json
 import os
 import time
@@ -24,6 +25,17 @@ def choosecity():
 @app.route("/setup")
 def setup():
     html = render_template("setup.html")
+    response = make_response(html)
+    return response
+
+# TODO: Does not work for multi-polygons yet
+@app.route("/setup-interactive")
+def setup_interactive():
+    token = 'pk.eyJ1IjoiZ2xhbmlld3NraSIsImEiOiJja28weW13eHEwNWNwMnZzNTZyZzRrMDN4In0.P2-EylpYdzmCgdASgAKC5g'
+    jawg_accessToken = 'uUILlBVmedZhJqrmWPczZMS9ytaAuTPvGqX5Z3bCC30qlHe2DSJCQZABdbznjyGr'
+    #r = requests.get('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/859/401/95/85940195.geojson')
+    #print(r.json()['geometry']['coordinates'])
+    html = render_template("setup-interactive.html", mapbox_access_token = token, jawg_accessToken = jawg_accessToken)
     response = make_response(html)
     return response
 
