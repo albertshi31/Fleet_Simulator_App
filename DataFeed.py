@@ -5,17 +5,16 @@ import csv
 import random
 import h3
 from geopy.distance import distance
+from shapely.geometry import Point
+from shapely.geometry.polygon import Polygon
 
 
 # Need to change to OFIPS instead of min/max lat/lon
 class DataFeed:
-    def __init__(self, depot_csv=None, lst_passenger_csv=None, min_lat=None, max_lat=None, min_lng=None, max_lng=None, modesplit=None):
+    def __init__(self, depot_csv=None, lst_lnglats=None, lst_passenger_csv=None, modesplit=10):
         self.depot_csv = depot_csv
+        self.polygon = Polygon(lst_lnglats)
         self.lst_passenger_csv = lst_passenger_csv
-        self.min_lat = min_lat
-        self.max_lat = max_lat
-        self.min_lng = min_lng
-        self.max_lng = max_lng
         self.modesplit = modesplit
         self.all_depots = []
         self.current_index_passenger_list = 0
@@ -47,9 +46,9 @@ class DataFeed:
         return self.all_depots
 
     def isInBounds(self, lat, lng, dest_lat, dest_lng):
-        result1 = self.min_lat <= lat and lat <= self.max_lat and self.min_lng <= lng and lng <= self.max_lng
-        result2 = self.min_lat <= dest_lat and dest_lat <= self.max_lat and self.min_lng <= dest_lng and dest_lng <= self.max_lng
-        return result1 and result2
+        point1 = Point(lng, lat)
+        point2 = Point(dest_lng, dest_lat)
+        return self.polygon.contains(point1) and self.polygon.contains(point2)
 
     def parsePassengers(self):
         for filename in self.lst_passenger_csv:
