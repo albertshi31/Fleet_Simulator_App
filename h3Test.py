@@ -21,3 +21,11 @@ polygon = Polygon([[-74.760851,40.199232],[-74.760897,40.199291],[-74.76092,40.1
 point = Point(-74.74294,40.21705) # create point
 print(polygon.contains(point)) # check if polygon contains point
 print(point.within(polygon)) # check if a point is in the polygon
+
+
+
+import dropbox
+
+import addfips
+af = addfips.AddFIPS()
+print(af.get_county_fips('Cook County', state='Illinois'))

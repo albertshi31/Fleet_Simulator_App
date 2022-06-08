@@ -82,8 +82,14 @@
   
 
     <script>
-      var map = L.map('map').setView([40.349193, -74.659288], 15);
-      map.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+      var locality_name;
+      var county_name;
+      var state_name;
+      var url_path;
+      var num_kiosks = 0;
+
+      var mymap = L.map('map').setView([40.349193, -74.659288], 15);
+      mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
           attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
           id: 'mapbox/streets-v11',
           accessToken: '{{mapbox_access_token}}'
@@ -100,7 +106,12 @@
         },
         sources: 'wof',
         onClick: (feature) => {
-          locality_gid = feature.properties.locality_gid.split(":")[2];
+          console.log(feature);
+          locality_name = feature.properties.locality;
+          county_name = feature.properties.county;
+          state_name = feature.properties.region;
+
+          let locality_gid = feature.properties.locality_gid.split(":")[2];
           console.log(locality_gid);
           url_path = locality_gid.match(/.{1,3}/g).join("/") + "/" + locality_gid + ".geojson";
           console.log(url_path);
@@ -121,15 +132,39 @@
               radius: 402.336 // 0.25 miles in meters
           }).addTo(map);
           console.log(e.latlng);
-          list_kiosks.push([e.latlng.lat, e.latlng.lng]);
-          $("#listkiosks").append(' <div class="panel-body">'+e.latlng+'</div> ');
+          num_kiosks += 1;
+          list_kiosks.push([num_kiosks, e.latlng.lat, e.latlng.lng]);
+          $("#listkiosks").append('<div class="panel-body">'+e.latlng+'</div>');
         }
       }
 
       var request = null;
       function submitKiosks() {
+        city_name = encodeURIComponent("test");
+        county_name = encodeURIComponent(county_name);
+        state_name = encodeURIComponent(state_name);
+        url_path = encodeURIComponent(url_path);
         list_kiosks = encodeURIComponent(list_kiosks);
-        console.log(list_kiosks);
+
+        var url = '/create_animation?city_name=' + city_name
+           + '&county_name=' + county_name
+           + '&state_name=' + state_name
+           + '&url_path=' + url_path
+           + '&list_kiosks=' + list_kiosks
+
+         console.log(url);
+
+         if (request != null) {
+              request.abort();
+          }
+
+          request = $.ajax(
+            {
+              type: 'POST',
+              url: url,
+              //success: handleResponse
+            }
+          );
       }
 
       map.on('click', placeKiosk);
