@@ -1,73 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Choose a City</title>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
-      integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ=="
-      crossorigin=""/>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"
-      integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ=="
-      crossorigin=""></script>
 
-    <!-- Showing Place Boundaries -->
-    <script src="https://api.jawg.io/libraries/jawg-places@latest/jawg-places.js?access-token={{jawg_accessToken}}"></script>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choose a City</title>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
+    integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ=="
+    crossorigin="" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css"
+    integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"
+    integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ=="
+    crossorigin=""></script>
 
-     <style>
+  <!-- Showing Place Boundaries -->
+  <script
+    src="https://api.jawg.io/libraries/jawg-places@latest/jawg-places.js?access-token={{jawg_accessToken}}"></script>
 
-       html, body {
-         margin: 0;
-       }
-      #map {
-          height: 100vh;
-          width: 100vw;
-          position: absolute;
-      }
-      #kiosks {
-        margin-left: 10px;
-        margin-top: 10px;
-        position: absolute;
-        background-color: rgba(255,255,255,0.9);
-        z-index: 1000;
-      }
-      .panel {
-          min-width: 20vw;
-          max-height: 50vh;
-          max-width: 30vw;
-          overflow: scroll;
-      }
-      .container {
-        border-radius: 10px;
-        max-width: 30vw;
-      }
-      .box {
-        margin:1.27836vw;
-      }
-      .my-custom-scrollbar {
-        position: relative;
-        max-height: 30vh;
-        overflow: auto;
-      }
-      button {
-        margin: 1vh auto;
-        display: block;
-      }
-      .btn-primary {
-        display: block;
-        color: #fff;
-        background-color: #007bff;
-        border-color: #007bff;
-      }
-      </style>
-  </head>
-  <body>
-    <div id="map">
-    </div>
-    <div class="container" id="kiosks" >
-      <div class="box">
+  <style>
+    html,
+    body {
+      margin: 0;
+    }
+
+    #map {
+      height: 100vh;
+      width: 100vw;
+      position: absolute;
+    }
+
+    #kiosks {
+      margin-left: 10px;
+      margin-top: 10px;
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.9);
+      z-index: 1000;
+    }
+
+    .panel {
+      min-width: 20vw;
+      max-height: 50vh;
+      max-width: 30vw;
+      overflow: scroll;
+    }
+
+    .container {
+      border-radius: 10px;
+      max-width: 30vw;
+    }
+
+    .box {
+      margin: 1.27836vw;
+    }
+
+    .my-custom-scrollbar {
+      position: relative;
+      max-height: 30vh;
+      overflow: auto;
+    }
+
+    button {
+      margin: 1vh auto;
+      display: block;
+    }
+
+    .btn-primary {
+      display: block;
+      color: #fff;
+      background-color: #007bff;
+      border-color: #007bff;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map">
+  </div>
+  <div class="container" id="kiosks">
+    <div class="box">
       <label for="placeKiosksCheck">Place Kiosks?</label>
       <input type="checkbox" id="placeKiosksCheck"><br>
       <div class="panel-heading">List of Kiosks:</div>
@@ -75,249 +87,296 @@
 
       </div>
       <button type="button" class="btn btn-primary" onclick="submitKiosks()">Submit</button>
+      <button type="button" class="btn btn-primary" onclick="toggleLayer()">Layer</button>
     </div>
   </div>
 
 
 
 
-    <script>
-      $("#kiosks").hide();
-      var locality_name;
-      var county_name;
-      var state_name;
-      var url_path;
-      var num_kiosks = 0;
-      var center_lng_lat;
+  <script>
+    function toggleLayer() {
+      L.VirtualGrid = null;
+      console.log('ocurr');
+    }
+    $("#kiosks").hide();
+    var locality_name;
+    var county_name;
+    var state_name;
+    var url_path;
+    var num_kiosks = 0;
+    var center_lng_lat;
 
-      var mymap = L.map('map').setView([40.349193, -74.659288], 15);
-      mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
-          attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-          id: 'mapbox/streets-v11',
-          accessToken: '{{mapbox_access_token}}'
-      }));
+    var mymap = L.map('map').setView([40.349193, -74.659288], 15);
+    mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+      attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+      id: 'mapbox/streets-v11',
+      accessToken: '{{mapbox_access_token}}'
+    }));
 
-      function fixMapBounds(lat1, lng1, lat2, lng2) {
-        mymap.fitBounds([[lat1, lng1],
-                         [lat2, lng2]]);
-        console.log(mymap.getBounds());
+    function fixMapBounds(lat1, lng1, lat2, lng2) {
+      mymap.fitBounds([[lat1, lng1],
+      [lat2, lng2]]);
+      console.log(mymap.getBounds());
+    }
+
+    let jawgPlaces = new JawgPlaces.Leaflet({
+      searchOnTyping: true,
+      adminArea: {
+        outlineColor: 'rgb(172,59,246)',
+        show: true,
+      },
+      marker: {
+        show: false,
+      },
+      sources: 'wof',
+      transition: {
+        type: 'jump',
+      },
+      onClick: (feature) => {
+        $("#kiosks").show();
+        L.virtualGrid = function (url, options) {
+          return new L.VirtualGrid(options);
+        };
+        L.virtualGrid().addTo(mymap);
+
+
+        console.log(feature);
+        locality_name = feature.properties.locality;
+        county_name = feature.properties.county;
+        state_name = feature.properties.region;
+        center_lng_lat = feature.geometry.coordinates;
+
+        let locality_gid = feature.properties.locality_gid.split(":")[2];
+        console.log(locality_gid);
+        url_path = locality_gid.match(/.{1,3}/g).join("/") + "/" + locality_gid + ".geojson";
+        console.log(url_path);
+
+        fixMapBounds(feature.bbox[1], feature.bbox[0], feature.bbox[3], feature.bbox[2]);
+        console.log(feature.bbox[1], feature.bbox[0], feature.bbox[3], feature.bbox[2]);
+      },
+      L: L,
+    });
+
+
+    mymap.addControl(jawgPlaces);
+
+    var list_kiosks = [];
+    function placeKiosk(e) {
+      if ($('#placeKiosksCheck').is(':checked')) {
+        var marker = L.marker(e.latlng).addTo(mymap);
+        var circle = L.circle(e.latlng, {
+          color: 'red',
+          fillColor: '#f03',
+          fillOpacity: 0.3,
+          radius: 402.336 // 0.25 miles in meters
+        }).addTo(mymap);
+        console.log(e.latlng);
+        num_kiosks += 1;
+        list_kiosks.push([num_kiosks, e.latlng.lat, e.latlng.lng]);
+        $("#listkiosks").append('<div class="panel-body">' + e.latlng + '</div>');
+      }
+    }
+
+    var request = null;
+    function submitKiosks() {
+      city_name = encodeURIComponent("test");
+      county_name = encodeURIComponent(county_name);
+      state_name = encodeURIComponent(state_name);
+      url_path = encodeURIComponent(url_path);
+      list_kiosks = encodeURIComponent(list_kiosks);
+      center_lng_lat = encodeURIComponent(center_lng_lat);
+
+      var url = '/create_animation?city_name=' + city_name
+        + '&county_name=' + county_name
+        + '&state_name=' + state_name
+        + '&url_path=' + url_path
+        + '&list_kiosks=' + list_kiosks
+        + '&center_lng_lat=' + center_lng_lat
+
+      console.log(url);
+
+      if (request != null) {
+        request.abort();
       }
 
-      let jawgPlaces = new JawgPlaces.Leaflet({
-        searchOnTyping: true,
-        adminArea: {
-          outlineColor: 'rgb(172,59,246)',
-          show: true,
-        },
-        marker: {
-          show: false,
-        },
-        sources: 'wof',
-        transition: {
-          type: 'jump',
-        },
-        onClick: (feature) => {
-          $("#kiosks").show();
-          L.virtualGrid = function(url, options){
-            return new L.VirtualGrid(options);
-          };
-          L.virtualGrid().addTo(mymap);
-
-          console.log(feature);
-          locality_name = feature.properties.locality;
-          county_name = feature.properties.county;
-          state_name = feature.properties.region;
-          center_lng_lat = feature.geometry.coordinates;
-
-          let locality_gid = feature.properties.locality_gid.split(":")[2];
-          console.log(locality_gid);
-          url_path = locality_gid.match(/.{1,3}/g).join("/") + "/" + locality_gid + ".geojson";
-          console.log(url_path);
-
-          fixMapBounds(feature.bbox[1], feature.bbox[0], feature.bbox[3], feature.bbox[2]);
-          console.log(feature.bbox[1], feature.bbox[0], feature.bbox[3], feature.bbox[2]);
-        },
-        L: L,
-      });
-
-
-      mymap.addControl(jawgPlaces);
-
-      var list_kiosks = [];
-      function placeKiosk(e) {
-        if ($('#placeKiosksCheck').is(':checked')) {
-          var marker = L.marker(e.latlng).addTo(mymap);
-          var circle = L.circle(e.latlng, {
-              color: 'red',
-              fillColor: '#f03',
-              fillOpacity: 0.3,
-              radius: 402.336 // 0.25 miles in meters
-          }).addTo(mymap);
-          console.log(e.latlng);
-          num_kiosks += 1;
-          list_kiosks.push([num_kiosks, e.latlng.lat, e.latlng.lng]);
-          $("#listkiosks").append('<div class="panel-body">'+e.latlng+'</div>');
+      request = $.ajax(
+        {
+          type: 'GET',
+          url: url,
+          success: function (response) {
+            document.write(response);
+          }
         }
-      }
+      );
+    }
 
-      var request = null;
-      function submitKiosks() {
-        city_name = encodeURIComponent("test");
-        county_name = encodeURIComponent(county_name);
-        state_name = encodeURIComponent(state_name);
-        url_path = encodeURIComponent(url_path);
-        list_kiosks = encodeURIComponent(list_kiosks);
-        center_lng_lat = encodeURIComponent(center_lng_lat);
+    mymap.on('click', placeKiosk);
 
-        var url = '/create_animation?city_name=' + city_name
-           + '&county_name=' + county_name
-           + '&state_name=' + state_name
-           + '&url_path=' + url_path
-           + '&list_kiosks=' + list_kiosks
-           + '&center_lng_lat=' + center_lng_lat
+    mymap.zoomControl.setPosition('bottomright');
 
-         console.log(url);
+    L.control.scale().addTo(mymap);
 
-         if (request != null) {
-              request.abort();
-          }
 
-          request = $.ajax(
-            {
-              type: 'GET',
-              url: url,
-              success: function(response){
-                document.write(response);
-              }
-            }
-          );
-      }
 
-      mymap.on('click', placeKiosk);
+    // // Beginning of Virtual grid code
+    // L.VirtualGrid = L.FeatureGroup.extend({
+    //   include: L.Mixin.Events,
+    //   options: {
+    //     cellSize: 222,
+    //     delayFactor: 2.5,
+    //     style: {
+    //       stroke: true,
+    //       color: '#3ac1f0',
+    //       dashArray: null,
+    //       lineCap: null,
+    //       lineJoin: null,
+    //       weight: 2,
+    //       opacity: 1,
 
-      mymap.zoomControl.setPosition('bottomright');
+    //       fill: true,
+    //       fillColor: null, //same as color by default
+    //       fillOpacity: 0,
 
-      L.control.scale().addTo(mymap);
+    //       clickable: false
+    //     }
+    //   },
+    //   initialize: function(options){
+    //     L.Util.setOptions(this, options);
+    //     L.FeatureGroup.prototype.initialize.call(this, [], options);
+    //   },
+    //   onAdd: function(mymap){
+    //     L.FeatureGroup.prototype.onAdd.call(this, mymap);
+    //     this._map = mymap;
+    //     this._cells = [];
+    //     this._setupGrid(mymap.getBounds());
+    //   },
+    //   onRemove: function(mymap){
+    //     L.FeatureGroup.prototype.onRemove.call(this, mymap);
+    //   },
 
-      L.VirtualGrid = L.FeatureGroup.extend({
-        include: L.Mixin.Events,
-        options: {
-          cellSize: 222,
-          delayFactor: 2.5,
-          style: {
-            stroke: true,
-            color: '#3ac1f0',
-            dashArray: null,
-            lineCap: null,
-            lineJoin: null,
-            weight: 2,
-            opacity: 1,
+    //   _clearLayer: function(e) {
+    //     this._cells = [];
+    //   },
+    //   _moveHandler: function(e){
+    //     this._renderCells(e.target.getBounds());
+    //   },
+    //   _dchandler: function(e) {
+    //     this.clearLayers();
+    //   },
+    //   _zoomHandler: function(e){
+    //     this.clearLayers();
+    //   },
+    //   _renderCells: function(bounds) {
+    //     var cells = this._cellsInBounds(bounds);
+    //     this.fire("newcells", cells);
+    //     for (var i = cells.length - 1; i >= 0; i--) {
+    //       var cell = cells[i];
+    //       if(this._loadedCells.indexOf(cell.id) === -1){
+    //         (function(cell, i){
+    //           setTimeout(this.addLayer.bind(this, L.rectangle(cell.bounds, this.options.style)), this.options.delayFactor*i);
+    //         }.bind(this))(cell, i);
+    //         this._loadedCells.push(cell.id);
+    //       }
+    //     }
+    //   },
+    //   _resizeHandler: function(e) {
+    //     this._setupSize();
+    //   },
+    //   _setupSize: function(){
+    //     this._rows = Math.ceil(this._map.getSize().x / this._cellSize);
+    //     this._cols = Math.ceil(this._map.getSize().y / this._cellSize);
+    //   },
+    //   _setupGrid: function(bounds){
+    //     this._origin = this._map.project(bounds.getNorthWest());
+    //     this._cellSize = this.options.cellSize;
+    //     this._setupSize();
+    //     this._loadedCells = [];
+    //     this.clearLayers();
+    //     this._renderCells(bounds);
+    //   },
+    //   _cellPoint:function(row, col){
+    //     var x = this._origin.x + (row*this._cellSize);
+    //     var y = this._origin.y + (col*this._cellSize);
+    //     return new L.Point(x, y);
+    //   },
+    //   _cellExtent: function(row, col){
+    //     var swPoint = this._cellPoint(row, col);
+    //     var nePoint = this._cellPoint(row-1, col-1);
+    //     var sw = this._map.unproject(swPoint);
+    //     var ne = this._map.unproject(nePoint);
+    //     return new L.LatLngBounds(ne, sw);
+    //   },
+    //   _cellsInBounds: function(bounds){
+    //     var offset = this._map.project(bounds.getNorthWest());
+    //     var center = bounds.getCenter();
+    //     var offsetX = this._origin.x - offset.x;
+    //     var offsetY = this._origin.y - offset.y;
+    //     var offsetRows = Math.round(offsetX / this._cellSize);
+    //     var offsetCols = Math.round(offsetY / this._cellSize);
+    //     var cells = [];
+    //     for (var i = 0; i <= this._rows; i++) {
+    //       for (var j = 0; j <= this._cols; j++) {
+    //         var row = i-offsetRows;
+    //         var col = j-offsetCols;
+    //         var cellBounds = this._cellExtent(row, col);
+    //         var cellId = row+":"+col;
+    //         cells.push({
+    //           id: cellId,
+    //           bounds: cellBounds,
+    //           distance:cellBounds.getCenter().distanceTo(center)
+    //         });
+    //       }
+    //     }
+    //     cells.sort(function (a, b) {
+    //       return a.distance - b.distance;
+    //     });
+    //     return cells;
+    //   }
+    // });
 
-            fill: true,
-            fillColor: null, //same as color by default
-            fillOpacity: 0,
 
-            clickable: false
-          }
-        },
-        initialize: function(options){
-          L.Util.setOptions(this, options);
-          L.FeatureGroup.prototype.initialize.call(this, [], options);
-        },
-        onAdd: function(mymap){
-          L.FeatureGroup.prototype.onAdd.call(this, mymap);
-          this._map = mymap;
-          this._cells = [];
-          this._setupGrid(mymap.getBounds());
 
-          // map.on("move", this._moveHandler, this);
-          // map.on("zoomend", this._zoomHandler, this);
-          // map.on("resize", this._resizeHandler, this);
-        },
-        onRemove: function(mymap){
-          L.FeatureGroup.prototype.onRemove.call(this, mymap);
-          // map.off("move", this._moveHandler, this);
-          // map.off("zoomend", this._zoomHandler, this);
-          // map.off("resize", this._resizeHandler, this);
-        },
-        _clearLayer: function(e) {
-          this._cells = [];
-        },
-        _moveHandler: function(e){
-          this._renderCells(e.target.getBounds());
-        },
-        _zoomHandler: function(e){
-          this.clearLayers();
-          this._renderCells(e.target.getBounds());
-        },
-        _renderCells: function(bounds) {
-          var cells = this._cellsInBounds(bounds);
-          this.fire("newcells", cells);
-          for (var i = cells.length - 1; i >= 0; i--) {
-            var cell = cells[i];
-            if(this._loadedCells.indexOf(cell.id) === -1){
-              (function(cell, i){
-                setTimeout(this.addLayer.bind(this, L.rectangle(cell.bounds, this.options.style)), this.options.delayFactor*i);
-              }.bind(this))(cell, i);
-              this._loadedCells.push(cell.id);
-            }
-          }
-        },
-        _resizeHandler: function(e) {
-          this._setupSize();
-        },
-        _setupSize: function(){
-          this._rows = Math.ceil(this._map.getSize().x / this._cellSize);
-          this._cols = Math.ceil(this._map.getSize().y / this._cellSize);
-        },
-        _setupGrid: function(bounds){
-          this._origin = this._map.project(bounds.getNorthWest());
-          this._cellSize = this.options.cellSize;
-          this._setupSize();
-          this._loadedCells = [];
-          this.clearLayers();
-          this._renderCells(bounds);
-        },
-        _cellPoint:function(row, col){
-          var x = this._origin.x + (row*this._cellSize);
-          var y = this._origin.y + (col*this._cellSize);
-          return new L.Point(x, y);
-        },
-        _cellExtent: function(row, col){
-          var swPoint = this._cellPoint(row, col);
-          var nePoint = this._cellPoint(row-1, col-1);
-          var sw = this._map.unproject(swPoint);
-          var ne = this._map.unproject(nePoint);
-          return new L.LatLngBounds(ne, sw);
-        },
-        _cellsInBounds: function(bounds){
-          var offset = this._map.project(bounds.getNorthWest());
-          var center = bounds.getCenter();
-          var offsetX = this._origin.x - offset.x;
-          var offsetY = this._origin.y - offset.y;
-          var offsetRows = Math.round(offsetX / this._cellSize);
-          var offsetCols = Math.round(offsetY / this._cellSize);
-          var cells = [];
-          for (var i = 0; i <= this._rows; i++) {
-            for (var j = 0; j <= this._cols; j++) {
-              var row = i-offsetRows;
-              var col = j-offsetCols;
-              var cellBounds = this._cellExtent(row, col);
-              var cellId = row+":"+col;
-              cells.push({
-                id: cellId,
-                bounds: cellBounds,
-                distance:cellBounds.getCenter().distanceTo(center)
-              });
-            }
-          }
-          cells.sort(function (a, b) {
-            return a.distance - b.distance;
-          });
-          return cells;
-        }
-      });
 
-      </script>
-  </body>
+
+
+    // NEW TESTING
+    var tiles = new L.GridLayer();
+    tiles.createTile = function (coords) {
+      var tile = L.DomUtil.create('canvas', 'leaflet-tile');
+      var ctx = tile.getContext('2d');
+      var size = this.getTileSize()
+      tile.width = size.x
+      tile.height = size.y
+
+      // calculate projection coordinates of top left tile pixel
+      var nwPoint = coords.scaleBy(size)
+
+      // calculate geographic coordinates of top left tile pixel
+      var nw = mymap.unproject(nwPoint, coords.z)
+
+      // ctx.fillStyle = 'white';
+      // ctx.fillRect(0, 0, size.x, 50);
+      ctx.fillStyle = 'black';
+      // ctx.fillText('x: ' + coords.x + ', y: ' + coords.y + ', zoom: ' + coords.z, 20, 20);
+      // ctx.fillText('lat: ' + nw.lat + ', lon: ' + nw.lng, 20, 40);
+      ctx.strokeStyle = 'red';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(size.x - 1, 0);
+      ctx.lineTo(size.x - 1, size.y - 1);
+      ctx.lineTo(0, size.y - 1);
+      ctx.closePath();
+      ctx.stroke();
+      return tile;
+    }
+
+    L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data &copy; <a href="http://www.osm.org">OpenStreetMap</a>'
+    }).addTo(mymap)
+
+    tiles.addTo(mymap)
+  </script>
+</body>
+
 </html>
