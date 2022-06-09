@@ -90,8 +90,8 @@
       var num_kiosks = 0;
       var center_lng_lat;
 
-      var mymap = L.map('map').setView([40.349193, -74.659288], 15);
-      mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+      var map = L.map('map').setView([40.349193, -74.659288], 15);
+     map.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
           attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
           id: 'mapbox/streets-v11',
           accessToken: '{{mapbox_access_token}}'
@@ -150,7 +150,7 @@
           var circle = L.circle(e.latlng, {
               color: 'red',
               fillColor: '#f03',
-              fillOpacity: 0.5,
+              fillOpacity: 0.3,
               radius: 402.336 // 0.25 miles in meters
           }).addTo(mymap);
           console.log(e.latlng);
