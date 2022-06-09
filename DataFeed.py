@@ -11,7 +11,7 @@ from shapely.geometry.polygon import Polygon
 
 # Need to change to OFIPS instead of min/max lat/lon
 class DataFeed:
-    def __init__(self, depot_csv=None, lst_lnglats=None, lst_passenger_csv=None, modesplit=10):
+    def __init__(self, depot_csv=None, lst_lnglats=None, lst_passenger_csv=None, modesplit=None):
         self.depot_csv = depot_csv
         self.polygon = Polygon(lst_lnglats)
         self.lst_passenger_csv = lst_passenger_csv
@@ -27,6 +27,7 @@ class DataFeed:
         with open(self.depot_csv, 'r', encoding='utf-8-sig') as file:
             csvreader = csv.reader(file)
             header = next(csvreader)
+            print(header)
             name_idx = header.index("Name")
             lat_idx = header.index("Lat")
             long_idx = header.index("Long")

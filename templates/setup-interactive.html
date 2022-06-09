@@ -82,11 +82,13 @@
   
 
     <script>
+      $("#kiosks").hide();
       var locality_name;
       var county_name;
       var state_name;
       var url_path;
       var num_kiosks = 0;
+      var center_lng_lat;
 
       var mymap = L.map('map').setView([40.349193, -74.659288], 15);
       mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
@@ -106,10 +108,12 @@
         },
         sources: 'wof',
         onClick: (feature) => {
+          $("#kiosks").show();
           console.log(feature);
           locality_name = feature.properties.locality;
           county_name = feature.properties.county;
           state_name = feature.properties.region;
+          center_lng_lat = feature.geometry.coordinates;
 
           let locality_gid = feature.properties.locality_gid.split(":")[2];
           console.log(locality_gid);
@@ -145,12 +149,14 @@
         state_name = encodeURIComponent(state_name);
         url_path = encodeURIComponent(url_path);
         list_kiosks = encodeURIComponent(list_kiosks);
+        center_lng_lat = encodeURIComponent(center_lng_lat);
 
         var url = '/create_animation?city_name=' + city_name
            + '&county_name=' + county_name
            + '&state_name=' + state_name
            + '&url_path=' + url_path
            + '&list_kiosks=' + list_kiosks
+           + '&center_lng_lat=' + center_lng_lat
 
          console.log(url);
 
@@ -160,9 +166,11 @@
 
           request = $.ajax(
             {
-              type: 'POST',
+              type: 'GET',
               url: url,
-              //success: handleResponse
+              success: function(response){
+                document.write(response);
+              }
             }
           );
       }

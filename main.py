@@ -7,6 +7,9 @@ import compress_json
 import addfips
 from zipfile import ZipFile
 import csv
+import shutil
+from DepotMatrixAndBuildings import DepotMatrixAndBuildings
+
 
 from Dispatcher import Dispatcher
 
@@ -36,14 +39,12 @@ def setup():
 def setup_interactive():
     token = 'pk.eyJ1IjoiZ2xhbmlld3NraSIsImEiOiJja28weW13eHEwNWNwMnZzNTZyZzRrMDN4In0.P2-EylpYdzmCgdASgAKC5g'
     jawg_accessToken = 'uUILlBVmedZhJqrmWPczZMS9ytaAuTPvGqX5Z3bCC30qlHe2DSJCQZABdbznjyGr'
-    #r = requests.get('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/859/401/95/85940195.geojson')
-    #print(r.json()['geometry']['coordinates'])
     html = render_template("setup-interactive.html", mapbox_access_token = token, jawg_accessToken = jawg_accessToken)
     response = make_response(html)
     return response
 
 
-@app.route("/create_animation", methods=['POST'])
+@app.route("/create_animation", methods=['GET'])
 def create_animation():
     global CITY_NAME
     CITY_NAME = request.args.get('city_name')
@@ -52,7 +53,8 @@ def create_animation():
     url_path = request.args.get('url_path')
     list_kiosks = request.args.get('list_kiosks').split(',')
     list_kiosks = [[int(name), float(lat), float(lon)] for name, lat, lon in [list_kiosks[x:x+3] for x in range(0, len(list_kiosks), 3)]]
-    print(CITY_NAME, county_name, state_name, url_path, list_kiosks)
+    center_lng_lat = [float(elem) for elem in request.args.get('center_lng_lat').split(',')]
+    print(CITY_NAME, county_name, state_name, url_path, list_kiosks, center_lng_lat)
 
     af = addfips.AddFIPS()
     fips_code = af.get_county_fips(county_name, state=state_name)
@@ -67,29 +69,43 @@ def create_animation():
                 f.extractall(os.path.join(THIS_FOLDER, "local_static"), members = list_of_files_to_unzip)
             break
 
-    depot_data_filename = CITY_NAME+"_AV_STATION.csv"
+    depot_data_filename = CITY_NAME+"_AV_Station.csv"
     fields = ["Name", "Lat", "Long"]
-    with open(os.path.join(THIS_FOLDER, "local_static", depot_data_filename), 'w') as csvfile:
+    with open(os.path.join(THIS_FOLDER, "local_static", depot_data_filename), 'w', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
         csvwriter.writerow(fields)
         csvwriter.writerows(list_kiosks)
 
+    r = requests.get('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/' + url_path)
+    lst_lnglats = r.json()['geometry']['coordinates'][0]
+
+    # Make the CITY_NAME folder to store files inside
+    shutil.rmtree(os.path.join(THIS_FOLDER, "static", CITY_NAME), ignore_errors=True)
+    os.mkdir(os.path.join(THIS_FOLDER, "static", CITY_NAME))
+
+    # Create Depot Matrix and Depot Building Objects for Visualization
+    a = DepotMatrixAndBuildings(os.path.join(THIS_FOLDER, "local_static", depot_data_filename), CITY_NAME)
+    a.createDepotMatrix()
+    a.createDepotBuildings(50, 0.0002)
 
     start_time = time.time()
-    # global THIS_FOLDER
-    input_datafeed_depot_data = os.path.join(THIS_FOLDER, "local_static", depot_data_csv)
+    input_datafeed_depot_data = os.path.join(THIS_FOLDER, "local_static", depot_data_filename)
     input_datafeed_trip_data = []
-    for trip_data_csv in lst_trip_data_csv:
+    for trip_data_csv in list_of_files_to_unzip:
         input_datafeed_trip_data.append("local_static/" + trip_data_csv)
+
+    # TODO: Allow users to choose these variables
+    modesplit = 10
+    angry_passenger_threshold_sec = 300
+    lst_fleetsize = [100]
 
     print(input_datafeed_trip_data)
     print("MODESPLIT:", modesplit)
-    print(min_lat, max_lat, min_lng, max_lng)
 
     lst_passengers_left = []
 
     aDispatcher = Dispatcher(CITY_NAME, angry_passenger_threshold_sec)
-    aDispatcher.createDataFeed(input_datafeed_depot_data, input_datafeed_trip_data, min_lat, max_lat, min_lng, max_lng, modesplit)
+    aDispatcher.createDataFeed(input_datafeed_depot_data, lst_lnglats, input_datafeed_trip_data, modesplit)
 
     for idx, fleetsize in enumerate(lst_fleetsize):
         print("Fleetsize:", fleetsize)
@@ -144,8 +160,8 @@ def create_animation():
 
             my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "viewstate_coordinates.txt")
             with open(my_file, "w") as f:
-                avg_lat = (min_lat + max_lat)/2
-                avg_lng = (min_lng + max_lng)/2
+                avg_lat = center_lng_lat[1]
+                avg_lng = center_lng_lat[0]
                 f.write(str([avg_lat, avg_lng]))
 
             break
@@ -216,4 +232,4 @@ def graph_page():
     return response
 
 #Comment out before updating PythonAnywhere
-app.run()
+app.run(host="localhost", port=8000, debug=True)
