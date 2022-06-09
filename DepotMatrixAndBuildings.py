@@ -64,9 +64,9 @@ class DepotMatrixAndBuildings:
         with open("static/" + self.city_name + "/depotbuildings.csv", "w") as f:
             json.dump(buildings, f)
 
-a = DepotMatrixAndBuildings("local_static/BQXv2_AV_Station.csv", "BQXv2")
-a.createDepotMatrix()
-a.createDepotBuildings(50, 0.0002)
+# a = DepotMatrixAndBuildings("local_static/BQXv2_AV_Station.csv", "BQXv2")
+# a.createDepotMatrix()
+# a.createDepotBuildings(50, 0.0002)
 
 #with open("depotmatrix.txt", "r") as f:
 #    data = json.load(f)

@@ -24,7 +24,10 @@ print(point.within(polygon)) # check if a point is in the polygon
 
 
 
-import dropbox
+import requests
+
+r = requests.get('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/859/758/13/85975813.geojson')
+print(r.json()['geometry']['coordinates'][0])
 
 import addfips
 af = addfips.AddFIPS()

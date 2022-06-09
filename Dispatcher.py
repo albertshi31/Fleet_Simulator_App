@@ -29,9 +29,9 @@ class Dispatcher:
         self.leave_after_wait_time_sec = angry_passenger_threshold_sec
         self.VEHICLE_REPOSITIONING_INTERVAL = 100
 
-    def createDataFeed(self, depot_csv=None, lst_passenger_csv=None, min_lat=None, max_lat=None, min_lng=None, max_lng=None, modesplit=None):
+    def createDataFeed(self, depot_csv=None, lst_lnglats=None, lst_passenger_csv=None, modesplit=None):
         print(lst_passenger_csv)
-        self.DataFeed = DataFeed(depot_csv, lst_passenger_csv, min_lat, max_lat, min_lng, max_lng, modesplit)
+        self.DataFeed = DataFeed(depot_csv, lst_lnglats, lst_passenger_csv, modesplit)
         self.DataFeed.parsePassengers()
         self.DataFeed.parseDepots()
 
