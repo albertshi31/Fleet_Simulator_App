@@ -76,7 +76,7 @@ def create_animation():
 
 
     start_time = time.time()
-    global THIS_FOLDER
+    # global THIS_FOLDER
     input_datafeed_depot_data = os.path.join(THIS_FOLDER, "local_static", depot_data_csv)
     input_datafeed_trip_data = []
     for trip_data_csv in lst_trip_data_csv:

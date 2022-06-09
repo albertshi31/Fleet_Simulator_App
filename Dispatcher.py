@@ -10,6 +10,7 @@ import numpy as np
 
 class Dispatcher:
     def __init__(self, city_name, angry_passenger_threshold_sec):
+        # Initialize all class variables
         self.num_vehicles = 0
         self.all_vehicle_list = []
         self.active_vehicle_list = {}
@@ -29,6 +30,7 @@ class Dispatcher:
         self.leave_after_wait_time_sec = angry_passenger_threshold_sec
         self.VEHICLE_REPOSITIONING_INTERVAL = 100
 
+    # Initializes DataFeed class
     def createDataFeed(self, depot_csv=None, lst_passenger_csv=None, min_lat=None, max_lat=None, min_lng=None, max_lng=None, modesplit=None):
         print(lst_passenger_csv)
         self.DataFeed = DataFeed(depot_csv, lst_passenger_csv, min_lat, max_lat, min_lng, max_lng, modesplit)
@@ -39,10 +41,11 @@ class Dispatcher:
         self.DataFeed.resetPassengerList()
         self.DataFeed.resetDepots()
 
+    # Creates specified number of vehicle objects
     def createNumVehicles(self, num_vehicles):
         self.all_vehicle_list = []
         self.num_vehicles = num_vehicles
-        for i in range(num_vehicles):
+        for _ in range(num_vehicles):
             self.all_vehicle_list.append(Vehicle())
 
     def numDepots(self):
@@ -65,8 +68,30 @@ class Dispatcher:
     #     closest_depot = self.DataFeed.all_depots[lst_distances.index(min(lst_distances))]
     #     return closest_depot
 
+    def create_list(self, passengers, starting_depot, ending_depot, matrix):
+        ret_list = []
+        remaining_dests = []
+        for pax in passengers:
+            remaining_dests.append(pax.dest_depot)
+        ret_list.append(starting_depot)
+        curr = starting_depot
+        while remaining_dests:
+            distances = []
+            for i in range(remaining_dests):
+                currdist = matrix["{},{};{},{}".format(curr.lat, curr.lon, remaining_dests[i].lat, remaining_dests[i].lon)]["route_distance"]
+                distances.append(currdist)
+
+            remaining_dests.remove(curr)
+            curr = remaining_dests(np.argmin(distances))
+            ret_list.append(curr)
+        if ending_depot:
+            ret_list.append(ending_depot)
+        return ret_list
+
     def routeVehicle(self, starting_depot, passengers, ending_depot, matrix, start_time, total_num_passengers, trips, num_active_passengers_decreases_over_time):
-        lst_locations = list(set([pax.dest_depot for pax in passengers]))
+        # Creates list of locations that a specific vehicle will take (given all entered passangers)
+        lst_locations = self.create_list(passengers, starting_depot, ending_depot, matrix)
+
         lst_locations.insert(0, starting_depot)
         if ending_depot:
             lst_locations.append(ending_depot)
@@ -77,7 +102,9 @@ class Dispatcher:
         trip_duration = 0
         trip_timestamps = []
         num_passengers = total_num_passengers
-        for idx, pair in enumerate(list(zip(lst_locations, lst_locations[1:]))):
+
+        # Looks like calculating route section by section to calculate statistics
+        for _, pair in enumerate(list(zip(lst_locations, lst_locations[1:]))):
             entry = matrix["{},{};{},{}".format(pair[0].lat, pair[0].lon, pair[1].lat, pair[1].lon)]
             trip_latlngs = entry["route_latlngs"]
             trip_latlngs = [[elem[1], elem[0]] for elem in trip_latlngs] # DeckGL requires coords in (lon,lat) format
@@ -122,7 +149,7 @@ class Dispatcher:
         # Allocate vehicles to depots
         num_depots = len(self.DataFeed.getDepots())
 
-        # ALlocate vehicles according to predicted future demand, instead of naive
+        # TODO: Allocate vehicles according to predicted future demand, instead of naive
         for idx, vehicle in enumerate(self.all_vehicle_list):
             depot = self.DataFeed.all_depots[idx % num_depots]
             depot.addVehicle(vehicle)
@@ -133,14 +160,19 @@ class Dispatcher:
 
         start = time.time()
 
+        # Initilalizing variables
         max_capacity = 4
         total_passengers = 0
         served_passengers = 0
         time_sec = 0
+
+        # Not sure?
         THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
         my_file = os.path.join(THIS_FOLDER, "static", self.city_name, "depotmatrix.csv")
         with open(my_file, "r") as f:
             matrix = json.load(f)
+
+        # Initializing empty variables
         trips = []
         depot_locations = []
         missed_passengers = []
@@ -187,6 +219,9 @@ class Dispatcher:
             for vehicle in self.all_vehicle_list:
                 # If vehicle has left home depot with passengers
                 # FIX: Have the vehicle pick up passengers along the way!
+
+
+                # Deactivate arrived vehicles
                 if vehicle.active == True:
                     if vehicle.arrival_at_depot_time == time_sec:
                         vehicle.active = False
