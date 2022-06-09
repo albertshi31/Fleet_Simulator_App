@@ -27,7 +27,6 @@ class DataFeed:
         with open(self.depot_csv, 'r', encoding='utf-8-sig') as file:
             csvreader = csv.reader(file)
             header = next(csvreader)
-            print(header)
             name_idx = header.index("Name")
             lat_idx = header.index("Lat")
             long_idx = header.index("Long")
