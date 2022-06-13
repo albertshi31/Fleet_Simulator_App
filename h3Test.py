@@ -32,3 +32,10 @@ print(r.json()['geometry']['coordinates'][0])
 import addfips
 af = addfips.AddFIPS()
 print(af.get_county_fips('Cook County', state='Illinois'))
+
+def isInBoundsLatLng(lat, lng, min_lat, max_lat, min_lng, max_lng):
+    result1 = lat >= min_lat and lat <= max_lat
+    result2 = lng >= min_lng and lng <= max_lng
+    return result1 and result2
+
+print(isInBoundsLatLng(40.21705, -74.74294, 40, 45, -75, -73))

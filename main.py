@@ -9,7 +9,10 @@ from zipfile import ZipFile
 import csv
 import shutil
 from DepotMatrixAndBuildings import DepotMatrixAndBuildings
-
+from SortRoutesByPriority import Graph
+import h3
+from random import sample
+import polyline
 
 from Dispatcher import Dispatcher
 
@@ -17,6 +20,7 @@ global THIS_FOLDER
 THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
 global CITY_NAME
 CITY_NAME = ""
+global list_of_unzipped_files
 
 app = Flask("__main__", template_folder=os.path.join(THIS_FOLDER, "templates"))
 
@@ -43,6 +47,129 @@ def setup_interactive():
     response = make_response(html)
     return response
 
+# Extract zipped files that contain person trips within the county
+def extract_person_trip_files(county_name, state_name):
+    af = addfips.AddFIPS()
+    fips_code = af.get_county_fips(county_name, state=state_name)
+    global THIS_FOLDER
+    for filename in os.listdir(os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed")):
+        if state_name.replace(" ", "") in filename:
+            filepath = os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed", filename)
+            print(filepath)
+            with ZipFile(filepath, 'r') as f:
+                list_of_zipped_files = ZipFile.namelist(f)
+                list_of_files_to_unzip = [filename for filename in list_of_zipped_files if fips_code in filename]
+                f.extractall(os.path.join(THIS_FOLDER, "local_static"), members = list_of_files_to_unzip)
+                global list_of_unzipped_files
+                list_of_unzipped_files = list_of_files_to_unzip
+            break
+
+def isInBoundsLatLng(lat, lng, min_lat, max_lat, min_lng, max_lng):
+    result1 = lat >= min_lat and lat <= max_lat
+    result2 = lng >= min_lng and lng <= max_lng
+    return result1 and result2
+
+def filter_person_trip_files(list_of_unzipped_files, min_lat, max_lat, min_lng, max_lng):
+    result_lst_latlngs = []
+    for filename in list_of_unzipped_files:
+        with open(filename, 'r', encoding='utf-8-sig') as file:
+            csvreader = csv.reader(file)
+            header = next(csvreader)
+            lat_idx = header.index("OLat")
+            long_idx = header.index("OLon")
+            dest_lat_idx = header.index("DLat")
+            dest_long_idx = header.index("DLon")
+            for row in csvreader:
+                lat = float(row[lat_idx])
+                lng = float(row[long_idx])
+                dest_lat = float(row[dest_lat_idx])
+                dest_lng = float(row[dest_long_idx])
+                if isInBoundsLatLng(lat, lng, min_lat, max_lat, min_lng, max_lng) and isInBoundsLatLng(dest_lat, dest_lng, min_lat, max_lat, min_lng, max_lng):
+                    result_lst_latlngs.append([lat, lng])
+                    result_lst_latlngs.append([dest_lat, dest_lng])
+    return result_lst_latlngs
+
+def getRouteMeta(latlng1, latlng2):
+    loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
+    url = "http://127.0.0.1:5000/route/v1/driving/"
+    r = requests.get(url + loc)
+    if r.status_code != 200:
+        return {}
+    res = r.json()
+    route_latlngs = polyline.decode(res['routes'][0]['geometry'])
+    route_distance = res['routes'][0]['distance']
+    route_duration = res['routes'][0]['duration']
+    return route_latlngs, route_distance, route_duration
+
+def getNearestStreetCoordinate(latlng1):
+    loc = "{},{}".format(latlng1[1], latlng1[0])
+    url = "http://127.0.0.1:5000/nearest/v1/driving/"
+    r = requests.get(url + loc)
+    if r.status_code != 200:
+        return {}
+    res = r.json()
+    print(res)
+    return "SUCCESS"
+
+@app.route("/get_routes")
+def get_routes():
+    route_metas = {}
+    result_route_metas = {}
+    lst_latlngs = request.args.get('lst_latlngs').split(',')
+    lst_latlngs = [[float(lat), float(lon)] for lat, lon in [lst_latlngs[x:x+2] for x in range(0, len(lst_latlngs), 2)]]
+
+    graph = Graph(len(lst_latlngs))
+    for idx1, lat_lng1 in enumerate(lst_latlngs):
+        for idx2, lat_lng2 in enumerate(lst_latlngs):
+            if not idx1 is idx2 and not '{};{}'.format(idx1, idx2) in route_metas and not '{};{}'.format(idx2, idx1) in route_metas:
+                route_latlngs, route_distance, route_duration = getRouteMeta(lat_lng1, lat_lng2)
+                route_metas['{};{}'.format(idx1, idx2)] = {'latlngs': route_latlngs, 'distance': route_distance, 'duration': route_duration}
+                graph.addEdge(idx1, idx2, route_duration)
+
+    result = graph.KruskalMST()
+    print(result)
+    for key in result:
+        result_route_metas[key] = route_metas[key]
+    return result_route_metas
+
+@app.route("/get_heatmap")
+def get_heatmap():
+    county_name = request.args.get('county_name')
+    state_name = request.args.get('state_name')
+    min_lng, min_lat, max_lng, max_lat = [float(elem) for elem in request.args.get('bbox').split(',')]
+    print(min_lng, min_lat, max_lng, max_lat)
+
+    extract_person_trip_files(county_name, state_name)
+
+    global list_of_unzipped_files
+
+    input_datafeed_trip_data = []
+    for trip_data_csv in list_of_unzipped_files:
+        input_datafeed_trip_data.append("local_static/" + trip_data_csv)
+
+    lst_latlngs = filter_person_trip_files(input_datafeed_trip_data, min_lat, max_lat, min_lng, max_lng)
+
+    print(sample(lst_latlngs, 40))
+    h3_dict = {}
+    for lat, lng in lst_latlngs:
+        h3_index = h3.geo_to_h3(lat, lng, 10) # Larger means more granular heatmap
+        if h3_index in h3_dict:
+            h3_dict[h3_index] += 1
+        else:
+            h3_dict[h3_index] = 1
+
+    heatmap_data = {"max": 0, "min": 0, "data": []}
+    max = 0
+    for key, value in h3_dict.items():
+        if value > max:
+            max = value
+        lat, lng = h3.h3_to_geo(key)
+        new_h3_heatmap_entry = {"lat": lat, "lng": lng, "count": value}
+        heatmap_data["data"].append(new_h3_heatmap_entry)
+    heatmap_data["max"] = max
+
+    return heatmap_data
+
 
 @app.route("/create_animation", methods=['GET'])
 def create_animation():
@@ -55,19 +182,6 @@ def create_animation():
     list_kiosks = [[int(name), float(lat), float(lon)] for name, lat, lon in [list_kiosks[x:x+3] for x in range(0, len(list_kiosks), 3)]]
     center_lng_lat = [float(elem) for elem in request.args.get('center_lng_lat').split(',')]
     print(CITY_NAME, county_name, state_name, url_path, list_kiosks, center_lng_lat)
-
-    af = addfips.AddFIPS()
-    fips_code = af.get_county_fips(county_name, state=state_name)
-    global THIS_FOLDER
-    for filename in os.listdir(os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed")):
-        if state_name.replace(" ", "") in filename:
-            filepath = os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed", filename)
-            print(filepath)
-            with ZipFile(filepath, 'r') as f:
-                list_of_zipped_files = ZipFile.namelist(f)
-                list_of_files_to_unzip = [filename for filename in list_of_zipped_files if fips_code in filename]
-                f.extractall(os.path.join(THIS_FOLDER, "local_static"), members = list_of_files_to_unzip)
-            break
 
     depot_data_filename = CITY_NAME+"_AV_Station.csv"
     fields = ["Name", "Lat", "Long"]
@@ -91,7 +205,8 @@ def create_animation():
     start_time = time.time()
     input_datafeed_depot_data = os.path.join(THIS_FOLDER, "local_static", depot_data_filename)
     input_datafeed_trip_data = []
-    for trip_data_csv in list_of_files_to_unzip:
+    global list_of_unzipped_files
+    for trip_data_csv in list_of_unzipped_files:
         input_datafeed_trip_data.append("local_static/" + trip_data_csv)
 
     # TODO: Allow users to choose these variables

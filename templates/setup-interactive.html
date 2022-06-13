@@ -85,15 +85,20 @@
       <div class="panel-heading">List of Kiosks:</div>
       <div class="my-custom-scrollbar" id="listkiosks">
 
+      <div id="routenetwork">
+        Number of road miles to map: <span id="num_road_miles"></span>
+      </div>
       </div>
       <button type="button" class="btn btn-primary" onclick="submitKiosks()">Submit</button>
-      <button type="button" class="btn btn-primary" onclick="toggleLayer()">Layer</button>
+      <button type="button" class="btn btn-danger">Remove All Kiosks</button>
+      <button type="button" class="btn btn-info" onclick="toggleLayer()">Layer</button>
     </div>
   </div>
 
 
 
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.0/heatmap.min.js" integrity="sha512-FpvmtV53P/z7yzv1TAIVH7PNz94EKXs5aV6ts/Zi+B/VeGU5Xwo6KIbwpTgKc0d4urD/BtkK50IC9785y68/AA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-heatmap@1.0.0/leaflet-heatmap.min.js"></script>
   <script>
     function toggleLayer() {
       L.VirtualGrid = null;
@@ -106,8 +111,10 @@
     var url_path;
     var num_kiosks = 0;
     var center_lng_lat;
+    var bbox;
+    var routes = {};
 
-    var mymap = L.map('map').setView([40.349193, -74.659288], 15);
+    var mymap = L.map('map').setView([44.967243, -103.771556], 3);
     mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
       attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
       id: 'mapbox/streets-v11',
@@ -116,7 +123,7 @@
 
     function fixMapBounds(lat1, lng1, lat2, lng2) {
       mymap.fitBounds([[lat1, lng1],
-      [lat2, lng2]]);
+                      [lat2, lng2]]);
       console.log(mymap.getBounds());
     }
 
@@ -135,17 +142,12 @@
       },
       onClick: (feature) => {
         $("#kiosks").show();
-        L.virtualGrid = function (url, options) {
-          return new L.VirtualGrid(options);
-        };
-        L.virtualGrid().addTo(mymap);
-
-
         console.log(feature);
         locality_name = feature.properties.locality;
         county_name = feature.properties.county;
         state_name = feature.properties.region;
         center_lng_lat = feature.geometry.coordinates;
+        bbox = feature.bbox;
 
         let locality_gid = feature.properties.locality_gid.split(":")[2];
         console.log(locality_gid);
@@ -154,6 +156,8 @@
 
         fixMapBounds(feature.bbox[1], feature.bbox[0], feature.bbox[3], feature.bbox[2]);
         console.log(feature.bbox[1], feature.bbox[0], feature.bbox[3], feature.bbox[2]);
+
+        getHeatmap();
       },
       L: L,
     });
@@ -162,23 +166,143 @@
     mymap.addControl(jawgPlaces);
 
     var list_kiosks = [];
+    var markers = {};   // assigning circles to each marker
+
+    function moveToKiosk(marker_id) {
+      console.log("Pressed");
+      mymap.setView(markers[marker_id].getLatLng());
+    };
+
+
     function placeKiosk(e) {
       if ($('#placeKiosksCheck').is(':checked')) {
-        var marker = L.marker(e.latlng).addTo(mymap);
+        num_kiosks += 1;
+
+        var marker = L.marker(e.latlng, {
+          draggable: true,
+          autoPan: true,
+        }).addTo(mymap);
+        marker.on('drag', function(e){
+          markers[marker._leaflet_id].setLatLng(e.latlng);
+          $('#'+marker._leaflet_id).text(e.latlng);
+        });
+        marker.on('dragend', function(e){
+          getRoutes(markers);
+        });
         var circle = L.circle(e.latlng, {
           color: 'red',
           fillColor: '#f03',
           fillOpacity: 0.3,
           radius: 402.336 // 0.25 miles in meters
         }).addTo(mymap);
+        markers[marker._leaflet_id] = circle;
+
         console.log(e.latlng);
-        num_kiosks += 1;
         list_kiosks.push([num_kiosks, e.latlng.lat, e.latlng.lng]);
-        $("#listkiosks").append('<div class="panel-body">' + e.latlng + '</div>');
+        $("#listkiosks").append('<div class="panel-body"><button type="button" class="btn btn-outline-info" onclick="moveToKiosk('+ marker._leaflet_id +')"><span id="' + marker._leaflet_id + '">' + e.latlng + '</span></button></div>');
+
+        getRoutes(markers);
       }
+    };
+
+    function renderHeatmap(response) {
+      var heatmap_data = response;
+      var cfg = {
+        // radius should be small ONLY if scaleRadius is true (or small radius is intended)
+        // if scaleRadius is false it will be the constant radius used in pixels
+        "radius": 50,
+        "maxOpacity": .8,
+        // scales the radius based on map zoom
+        "scaleRadius": false,
+        // if set to false the heatmap uses the global maximum for colorization
+        // if activated: uses the data maximum within the current map boundaries
+        //   (there will always be a red spot with useLocalExtremas true)
+        "useLocalExtrema": false,
+        // which field name in your data represents the latitude - default "lat"
+        latField: 'lat',
+        // which field name in your data represents the longitude - default "lng"
+        lngField: 'lng',
+        // which field name in your data represents the data value - default "value"
+        valueField: 'count'
+      };
+      var heatmapLayer = new HeatmapOverlay(cfg);
+      heatmapLayer.addTo(mymap);
+      heatmapLayer.setData(heatmap_data);
+      console.log(response);
+    };
+
+    var routeLayerGroup = L.layerGroup().addTo(mymap);
+    function renderRoutes(response) {
+      routeLayerGroup.clearLayers();
+      console.log(response);
+      let total_distance = 0;
+      for (let key in response) {
+        let latlngs = response[key].latlngs;
+        let distance = response[key].distance / 1609.34; // convert from meters to miles
+        total_distance += distance;
+        let duration = response[key].duration / 60; // convert from seconds to minutes
+        var polyline = L.polyline(latlngs, {color: 'blue', weight: 3}).bindTooltip("Distance: <b>"+distance.toFixed(2)+" miles</b><br>Duration: <b>"+duration.toFixed(2)+" minutes</b>", {
+        	sticky: true
+        }).addTo(routeLayerGroup);
+        polyline.on('mouseover', function(e) {
+          var layer = e.target;
+          layer.setStyle({
+              color: 'red',
+              weight: 5
+          });
+        });
+        polyline.on('mouseout', function(e) {
+          var layer = e.target;
+          layer.setStyle({
+              color: 'blue',
+              weight: 3
+          });
+        });
+      }
+      $('#num_road_miles').text(total_distance.toFixed(2));
     }
 
     var request = null;
+    function getRoutes(markers) {
+      console.log(markers);
+      var lst_latlngs = [];
+      for (let key in markers) {
+        latlng = markers[key].getLatLng();
+        lst_latlngs.push([latlng.lat, latlng.lng]);
+      }
+      console.log(lst_latlngs);
+      lst_latlngs = encodeURIComponent(lst_latlngs);
+      var url = '/get_routes?lst_latlngs=' + lst_latlngs
+
+      request = $.ajax(
+        {
+          type: 'GET',
+          url: url,
+          success: renderRoutes
+        }
+      );
+    }
+
+    function getHeatmap() {
+      county_name = encodeURIComponent(county_name);
+      state_name = encodeURIComponent(state_name);
+      bbox = encodeURIComponent(bbox);
+
+      var url = '/get_heatmap?county_name=' + county_name
+        + '&state_name=' + state_name
+        + '&bbox=' + bbox
+
+      console.log(url);
+
+      request = $.ajax(
+        {
+          type: 'GET',
+          url: url,
+          success: renderHeatmap
+        }
+      );
+    }
+
     function submitKiosks() {
       city_name = encodeURIComponent("test");
       county_name = encodeURIComponent(county_name);
@@ -195,10 +319,6 @@
         + '&center_lng_lat=' + center_lng_lat
 
       console.log(url);
-
-      if (request != null) {
-        request.abort();
-      }
 
       request = $.ajax(
         {
@@ -345,15 +465,15 @@
     tiles.createTile = function (coords) {
       var tile = L.DomUtil.create('canvas', 'leaflet-tile');
       var ctx = tile.getContext('2d');
-      var size = this.getTileSize()
-      tile.width = size.x
-      tile.height = size.y
+      var size = this.getTileSize();
+      tile.width = size.x;
+      tile.height = size.y;
 
       // calculate projection coordinates of top left tile pixel
-      var nwPoint = coords.scaleBy(size)
+      var nwPoint = coords.scaleBy(size);
 
       // calculate geographic coordinates of top left tile pixel
-      var nw = mymap.unproject(nwPoint, coords.z)
+      var nw = mymap.unproject(nwPoint, coords.z);
 
       // ctx.fillStyle = 'white';
       // ctx.fillRect(0, 0, size.x, 50);
@@ -370,10 +490,6 @@
       ctx.stroke();
       return tile;
     }
-
-    L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: 'Map data &copy; <a href="http://www.osm.org">OpenStreetMap</a>'
-    }).addTo(mymap)
 
     tiles.addTo(mymap)
   </script>
