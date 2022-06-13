@@ -39,6 +39,18 @@
       z-index: 1000;
     }
 
+    #loading_heatmap {
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      padding: 1000px;
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.5);
+      z-index: 10000;
+      white-space: nowrap;
+      font-size: 300%;
+    }
+
     .panel {
       min-width: 20vw;
       max-height: 50vh;
@@ -94,7 +106,13 @@
       <button type="button" class="btn btn-info" onclick="toggleLayer()">Layer</button>
     </div>
   </div>
-
+<div id="loading_heatmap">
+  Loading Heatmap...
+</div>
+  <div class="container" id="loader">
+    <div class="box">
+    </div>
+  </div>
 
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.0/heatmap.min.js" integrity="sha512-FpvmtV53P/z7yzv1TAIVH7PNz94EKXs5aV6ts/Zi+B/VeGU5Xwo6KIbwpTgKc0d4urD/BtkK50IC9785y68/AA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
