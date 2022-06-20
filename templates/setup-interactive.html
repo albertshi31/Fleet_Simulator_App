@@ -48,7 +48,7 @@
     }
 
     .panel {
-      min-width: 20vw;
+      min-width: 30vw;
       max-height: 50vh;
       max-width: 30vw;
       overflow: scroll;
@@ -56,7 +56,8 @@
 
     .container {
       border-radius: 10px;
-      max-width: 30vw;
+      width: 40vw;
+      max-width: 50vw;
     }
 
     .box {
@@ -75,12 +76,21 @@
       background-color: #007bff;
       border-color: #007bff;
     }
+    .btn-primary.disabled, .btn-primary:disabled {
+      position: relative;
+      color: #fff;
+      background-color: #007bff;
+      width: 20vh;
+      border-color: #007bff;
+      display: block;
+    }
 
     #distancematrix {
       max-height: 30vh;
       max-width: 30vw;
       overflow: scroll;
     }
+
   </style>
 </head>
 
@@ -119,7 +129,9 @@
         </div>
       </div>
     </div>
+    
   </div>
+
   <div id="map">
   </div>
   <div class="container" id="kiosks">
@@ -139,6 +151,13 @@
         <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#showSubmitModal">Simulate Trips</button>
         <button type="button" class="btn btn-danger" onclick="resetAll()">Reset All</button>
         <button type="button" class="btn btn-info" onclick="toggleLayer()">Layer</button>
+      </div>
+      <br> <br>
+      <div class="loading-icon">
+        <button class="btn btn-primary" type="button" disabled>
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          Loading...
+        </button>
       </div>
     </div>
   </div>
