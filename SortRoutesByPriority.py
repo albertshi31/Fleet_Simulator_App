@@ -19,6 +19,9 @@ class Graph:
     def addEdge(self, u, v, w):
         self.graph.append([u, v, w])
 
+    def removeMostRecentEdge(self):
+        self.graph = self.graph[:-1]
+
     # A utility function to find set of an element i
     # (uses path compression technique)
     def find(self, parent, i):
@@ -91,8 +94,6 @@ class Graph:
                 result.append('{};{}'.format(u, v))
                 self.union(parent, rank, x, y)
             # Else discard the edge
-
-        print(result)
         return result
 
     # Floyd Warshall Algorithm in python
@@ -108,6 +109,8 @@ class Graph:
 
     def floyd_warshall(self):
         self.createMatrix()
+        #print("BEFORE SOLVING:")
+        #self.printSolution(self.arr)
         distance = list(map(lambda i: list(map(lambda j: j, i)), self.arr))
 
         # Adding vertices individually
@@ -115,23 +118,85 @@ class Graph:
             for i in range(self.V):
                 for j in range(self.V):
                     distance[i][j] = min(distance[i][j], distance[i][k] + distance[k][j])
-        np.sum(distance)
+        #print("UNOPTIMIZED SOLVE:")
+        #self.printSolution(distance)
+        return distance
 
-    def getAllSortedRoutes(self):
+    def printSolution(self, dist):
+        print ("Following matrix shows the shortest distances between every pair of vertices")
+        for i in range(self.V):
+            for j in range(self.V):
+                if(dist[i][j] == sys.maxsize):
+                    print ("%7s" % ("INF"),end=" ")
+                else:
+                    print ("%7d" % (dist[i][j]),end=' ')
+                if j == self.V-1:
+                    print ()
+
+
+    def getAllSortedRoutes(self, route_metas):
+        remaining_route_metas = route_metas.copy()
+        temp_graph = Graph(self.V)
+        priority = 0
         keys_for_minimum_spanning_tree = self.KruskalMST()
+        if len(keys_for_minimum_spanning_tree) == 0:
+            return {}
+        assert(self.V-1 == len(keys_for_minimum_spanning_tree))
+        for key in keys_for_minimum_spanning_tree:
+            route_metas[key]["duration_matrix_minutes"] = None
+            route_metas[key]["duration_matrix_multiple"] = None
+            route_metas[key]["priority"] = priority
+            remaining_route_metas.pop(key)
+            idx1, idx2 = [int(elem) for elem in key.split(';')]
+            temp_graph.addEdge(idx1, idx2, route_metas[key]["duration"])
+            temp_graph.addEdge(idx2, idx1, route_metas[key]["duration"])
+            priority += 1
+
+        #STARTING MINIMUM SPANNING TREE DISTANCE MATRIX
+        mst_distance = temp_graph.floyd_warshall()
+        #print("MST")
+        #self.printSolution(mst_distance)
+        route_metas[key]["duration_matrix_minutes"] = np.around(mst_distance).tolist()
+
+        best_distance_matrix = mst_distance
+        while len(remaining_route_metas) > 0:
+            best_route_to_add_next_key = None
+            min_sum_distance = sys.maxsize*sys.maxsize
+            best_distance_matrix = None
+            for key, value in remaining_route_metas.items():
+                idx1, idx2 = [int(elem) for elem in key.split(';')]
+                temp_graph.addEdge(idx1, idx2, route_metas[key]["duration"])
+                temp_graph.addEdge(idx2, idx1, route_metas[key]["duration"])
+                distance = temp_graph.floyd_warshall()
+                if np.sum(distance) < min_sum_distance:
+                    best_route_to_add_next_key = key
+                    min_sum_distance = np.sum(distance)
+                    best_distance_matrix = distance
+                temp_graph.removeMostRecentEdge()
+                temp_graph.removeMostRecentEdge()
+            idx1, idx2 = [int(elem) for elem in best_route_to_add_next_key.split(';')]
+            temp_graph.addEdge(idx1, idx2, route_metas[best_route_to_add_next_key]["duration"])
+            temp_graph.addEdge(idx2, idx1, route_metas[best_route_to_add_next_key]["duration"])
+            route_metas[best_route_to_add_next_key]["priority"] = priority
+            route_metas[best_route_to_add_next_key]["duration_matrix_minutes"] = np.around(best_distance_matrix).tolist()
+            remaining_route_metas.pop(best_route_to_add_next_key)
+            priority += 1
+            #self.printSolution(best_distance_matrix)
+            #print("SUM", np.sum(best_distance_matrix))
 
 
-        for key, value in route_metas.items():
-            print(key, value)
+        # Go back and populate "duration_matrix_multiple" after knowing shortest path between vertices
+        for key in route_metas:
+            if not route_metas[key]["duration_matrix_minutes"] is None:
+                route_metas[key]["duration_matrix_multiple"] = np.around(np.nan_to_num(np.array(route_metas[key]["duration_matrix_minutes"])/np.array(best_distance_matrix)), decimals=2).tolist()
         return route_metas
 
-print(sys.maxsize)
 # Driver code
-g = Graph(3)
-g.addEdge(0, 1, 377.3)
-g.addEdge(0, 2, 559.4)
-g.addEdge(1, 2, 213.5)
-g.floyd_warshall()
+# g = Graph(3)
+# g.addEdge(0, 1, 377.3)
+# g.addEdge(0, 2, 559.4)
+# g.addEdge(1, 2, 213.5)
+# g.KruskalMST()
+# g.floyd_warshall()
 #
 # # Function call
-# g.KruskalMST()

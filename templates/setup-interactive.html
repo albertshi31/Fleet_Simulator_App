@@ -14,7 +14,7 @@
   <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"
     integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ=="
     crossorigin=""></script>
-
+  <script src="https://kit.fontawesome.com/cd50251ae1.js" crossorigin="anonymous"></script>
   <!-- Showing Place Boundaries -->
   <script
     src="https://api.jawg.io/libraries/jawg-places@latest/jawg-places.js?access-token={{jawg_accessToken}}"></script>
@@ -31,24 +31,20 @@
       position: absolute;
     }
 
+    #exampleModalCenter {
+      height: 100vh;
+      width: 100vw;
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.9);
+      z-index: 2000;
+    }
+
     #kiosks {
       margin-left: 10px;
       margin-top: 10px;
       position: absolute;
       background-color: rgba(255, 255, 255, 0.9);
       z-index: 1000;
-    }
-
-    #loading_heatmap {
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      padding: 1000px;
-      position: absolute;
-      background-color: rgba(255, 255, 255, 0.5);
-      z-index: 10000;
-      white-space: nowrap;
-      font-size: 300%;
     }
 
     .panel {
@@ -73,64 +69,102 @@
       overflow: auto;
     }
 
-    button {
-      margin: 1vh auto;
-      display: block;
-    }
-
     .btn-primary {
       display: block;
       color: #fff;
       background-color: #007bff;
       border-color: #007bff;
     }
+
+    #distancematrix {
+      max-height: 30vh;
+      max-width: 30vw;
+      overflow: scroll;
+    }
   </style>
 </head>
 
 <body>
+    <!-- Modal -->
+  <div class="modal fade" id="showSubmitModal" tabindex="-1" role="dialog" aria-labelledby="showSubmitModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+          <form id="createAnimationForm">
+              <label for="city_name">City Name</label>
+              <input id="city_name" type="text" name="city_name" required></input>
+              <br />
+
+              <label for="lst_fleetsize">Fleetsize(s)</label>
+              <input id="lst_fleetsize" type="text" name="lst_fleetsize" value="100" required></input>
+              <br />
+
+              <label for="modesplit">Modesplit (%)</label>
+              <input id="modesplit" type="number" name="modesplit" step="any" value="10" min="0" max="100" required></input>
+              <small class="form-text text-muted">Randomly chooses X% of trips to serve using this network.</small>
+              <br />
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </form>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="map">
   </div>
   <div class="container" id="kiosks">
     <div class="box">
       <label for="placeKiosksCheck">Place Kiosks?</label>
       <input type="checkbox" id="placeKiosksCheck"><br>
-      <div class="panel-heading">List of Kiosks:</div>
       <div class="my-custom-scrollbar" id="listkiosks">
-
+        <div class="panel-heading">List of Kiosks:</div>
+      </div>
       <div id="routenetwork">
-        Number of road miles to map: <span id="num_road_miles"></span>
+        Number of road miles to map: <span id="num_road_miles"></span> <br>
+        <!-- Least Dense<input id="routenetworkdensityslider" type="range" oninput="renderRoutes(this.value)">Most Dense -->
+        <div id="distancematrix"></div><br>
+        <!-- <button type="button" class="btn btn-info" onclick="duration_table_view='minutes'; updateDurationTable()">In Seconds</button> <button type="button" class="btn btn-info" onclick="duration_table_view='miles'; updateDurationTable()">In Miles</button> -->
       </div>
+      <div class="btn-group" role="group" aria-label="Button Group">
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#showSubmitModal">Simulate Trips</button>
+        <button type="button" class="btn btn-danger" onclick="resetAll()">Reset All</button>
+        <button type="button" class="btn btn-info" onclick="toggleLayer()">Layer</button>
       </div>
-      <button type="button" class="btn btn-primary" onclick="submitKiosks()">Submit</button>
-      <button type="button" class="btn btn-danger">Remove All Kiosks</button>
-      <button type="button" class="btn btn-info" onclick="toggleLayer()">Layer</button>
-    </div>
-  </div>
-<div id="loading_heatmap">
-  Loading Heatmap...
-</div>
-  <div class="container" id="loader">
-    <div class="box">
     </div>
   </div>
 
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.0/heatmap.min.js" integrity="sha512-FpvmtV53P/z7yzv1TAIVH7PNz94EKXs5aV6ts/Zi+B/VeGU5Xwo6KIbwpTgKc0d4urD/BtkK50IC9785y68/AA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet-heatmap@1.0.0/leaflet-heatmap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
   <script>
+    function resetAll() {
+      window.location.reload();
+    }
+
     function toggleLayer() {
       L.VirtualGrid = null;
       console.log('ocurr');
     }
     $("#kiosks").hide();
+    $("#routenetwork").hide();
     var locality_name;
     var county_name;
     var state_name;
     var url_path;
-    var num_kiosks = 0;
     var center_lng_lat;
     var bbox;
-    var routes = {};
 
     var mymap = L.map('map').setView([44.967243, -103.771556], 3);
     mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
@@ -142,7 +176,6 @@
     function fixMapBounds(lat1, lng1, lat2, lng2) {
       mymap.fitBounds([[lat1, lng1],
                       [lat2, lng2]]);
-      console.log(mymap.getBounds());
     }
 
     let jawgPlaces = new JawgPlaces.Leaflet({
@@ -160,7 +193,6 @@
       },
       onClick: (feature) => {
         $("#kiosks").show();
-        console.log(feature);
         locality_name = feature.properties.locality;
         county_name = feature.properties.county;
         state_name = feature.properties.region;
@@ -168,12 +200,11 @@
         bbox = feature.bbox;
 
         let locality_gid = feature.properties.locality_gid.split(":")[2];
-        console.log(locality_gid);
         url_path = locality_gid.match(/.{1,3}/g).join("/") + "/" + locality_gid + ".geojson";
-        console.log(url_path);
 
         fixMapBounds(feature.bbox[1], feature.bbox[0], feature.bbox[3], feature.bbox[2]);
-        console.log(feature.bbox[1], feature.bbox[0], feature.bbox[3], feature.bbox[2]);
+
+        $("#city_name").val(locality_name+", "+state_name);
 
         getHeatmap();
       },
@@ -183,29 +214,42 @@
 
     mymap.addControl(jawgPlaces);
 
-    var list_kiosks = [];
-    var markers = {};   // assigning circles to each marker
+    var markers = {};
+    var circles = {};
 
     function moveToKiosk(marker_id) {
-      console.log("Pressed");
       mymap.setView(markers[marker_id].getLatLng());
     };
+
+    function deleteKiosk(marker_id) {
+      mymap.removeLayer(markers[marker_id]);
+      mymap.removeLayer(circles[marker_id]);
+      delete markers[marker_id];
+      delete circles[marker_id];
+      $("#panel_"+marker_id).remove();
+      renderRoutes();
+      if (Object.keys(markers).length == 1) {
+        $("#routenetwork").hide();
+      }
+    }
 
 
     function placeKiosk(e) {
       if ($('#placeKiosksCheck').is(':checked')) {
-        num_kiosks += 1;
+        $('#routenetwork').show();
 
         var marker = L.marker(e.latlng, {
           draggable: true,
           autoPan: true,
         }).addTo(mymap);
         marker.on('drag', function(e){
-          markers[marker._leaflet_id].setLatLng(e.latlng);
-          $('#'+marker._leaflet_id).text(e.latlng);
+          circles[marker._leaflet_id].setLatLng(e.latlng);
+          $('#'+marker._leaflet_id).text(e.latlng.lat.toFixed(5) + ";" + e.latlng.lng.toFixed(5));
         });
+        markers[marker._leaflet_id] = marker;
         marker.on('dragend', function(e){
-          getRoutes(markers);
+          addMarker(markers, marker._leaflet_id);
+          console.log("Marker ID is " + marker._leaflet_id);
         });
         var circle = L.circle(e.latlng, {
           color: 'red',
@@ -213,13 +257,11 @@
           fillOpacity: 0.3,
           radius: 402.336 // 0.25 miles in meters
         }).addTo(mymap);
-        markers[marker._leaflet_id] = circle;
+        circles[marker._leaflet_id] = circle;
 
-        console.log(e.latlng);
-        list_kiosks.push([num_kiosks, e.latlng.lat, e.latlng.lng]);
-        $("#listkiosks").append('<div class="panel-body"><button type="button" class="btn btn-outline-info" onclick="moveToKiosk('+ marker._leaflet_id +')"><span id="' + marker._leaflet_id + '">' + e.latlng + '</span></button></div>');
+        $("#listkiosks").append('<div class="panel-body" id="panel_'+marker._leaflet_id+'"><button type="button" class="btn btn-outline-info" onclick="moveToKiosk('+ marker._leaflet_id +')"><span id="' + marker._leaflet_id + '">' + e.latlng.lat.toFixed(5) + ";" + e.latlng.lng.toFixed(5) + '</span></button><button onclick="deleteKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-trash-can fa-lg"></i></button></div>');
 
-        getRoutes(markers);
+        addMarker(markers, marker._leaflet_id);
       }
     };
 
@@ -246,19 +288,65 @@
       var heatmapLayer = new HeatmapOverlay(cfg);
       heatmapLayer.addTo(mymap);
       heatmapLayer.setData(heatmap_data);
-      console.log(response);
     };
 
+
+    function makeTableHTML(myArray) {
+      var result = "<table class='table table-bordered w-auto'>";
+      for(var i=0; i<myArray.length; i++) {
+          result += "<tr>";
+          for(var j=0; j<myArray[i].length; j++){
+              result += "<td>"+myArray[i][j]+"</td>";
+          }
+          result += "</tr>";
+      }
+      result += "</table>";
+
+      return result;
+    }
+
+    var curr_route_key;
+
+    // var duration_table_view = 'minutes';
+    // function updateDurationTable() {
+    //   if (duration_table_view == 'minutes') {
+    //     $('#distancematrix').html(makeTableHTML(routes_dict[curr_route_key].duration_matrix_minutes));
+    //   }
+    //   else {
+    //     $('#distancematrix').html(makeTableHTML(routes_dict[curr_route_key].duration_matrix_multiple));
+    //   }
+    // }
+
+    function cleanRouteDicts() {
+      var lst_latlngs = [];
+      for (let key in markers) {
+        latlng = markers[key].getLatLng();
+        lst_latlngs.push([latlng.lat, latlng.lng]);
+      }
+      for (key in routes_dict) {
+        str_lat_lng1 = key.split(";")[0].split(",");
+        lat_lng1 = [parseFloat(str_lat_lng1[0]), parseFloat(str_lat_lng1[1])];
+        str_lat_lng2 = key.split(";")[1].split(",");
+        lat_lng2 = [parseFloat(str_lat_lng2[0]), parseFloat(str_lat_lng2[1])];
+        if (!(lst_latlngs.some(elem => JSON.stringify(elem) === JSON.stringify(lat_lng1)) && lst_latlngs.some(elem => JSON.stringify(elem) === JSON.stringify(lat_lng2)))) {
+          delete routes_dict[key];
+        }
+      }
+    }
+
+    var allRouteLayerGroups = {};
+    var total_distance = 0;
+
     var routeLayerGroup = L.layerGroup().addTo(mymap);
-    function renderRoutes(response) {
+    function renderRoutes() {
+      cleanRouteDicts();
+      total_distance = 0;
       routeLayerGroup.clearLayers();
-      console.log(response);
-      let total_distance = 0;
-      for (let key in response) {
-        let latlngs = response[key].latlngs;
-        let distance = response[key].distance / 1609.34; // convert from meters to miles
+      for (let key in routes_dict) {
+        let latlngs = routes_dict[key].latlngs;
+        let distance = routes_dict[key].distance / 1609.34; // convert from meters to miles
         total_distance += distance;
-        let duration = response[key].duration / 60; // convert from seconds to minutes
+        let duration = routes_dict[key].duration / 60; // convert from seconds to minutes
         var polyline = L.polyline(latlngs, {color: 'blue', weight: 3}).bindTooltip("Distance: <b>"+distance.toFixed(2)+" miles</b><br>Duration: <b>"+duration.toFixed(2)+" minutes</b>", {
         	sticky: true
         }).addTo(routeLayerGroup);
@@ -278,29 +366,37 @@
         });
       }
       $('#num_road_miles').text(total_distance.toFixed(2));
+      //updateDurationTable();
     }
 
-    var request = null;
-    function getRoutes(markers) {
-      console.log(markers);
+    var request_routes = null;
+    function addMarker(lst_markers, new_marker_key) {
       var lst_latlngs = [];
-      for (let key in markers) {
-        latlng = markers[key].getLatLng();
+      for (let key in lst_markers) {
+        latlng = lst_markers[key].getLatLng();
         lst_latlngs.push([latlng.lat, latlng.lng]);
       }
-      console.log(lst_latlngs);
-      lst_latlngs = encodeURIComponent(lst_latlngs);
-      var url = '/get_routes?lst_latlngs=' + lst_latlngs
+      let new_marker = [lst_markers[new_marker_key].getLatLng().lat, lst_markers[new_marker_key].getLatLng().lng];
+      lst_latlngs_encoded = encodeURIComponent(lst_latlngs);
+      var url = '/get_routes?lst_latlngs=' + lst_latlngs_encoded
+        + '&new_marker=' + new_marker
 
-      request = $.ajax(
+      request_routes = $.ajax(
         {
           type: 'GET',
           url: url,
-          success: renderRoutes
+          success: addNewRoutes
         }
       );
     }
 
+    var routes_dict = {};
+    function addNewRoutes(response) {
+      Object.assign(routes_dict, response);
+      renderRoutes();
+    }
+
+    var request_heatmap = null;
     function getHeatmap() {
       county_name = encodeURIComponent(county_name);
       state_name = encodeURIComponent(state_name);
@@ -312,7 +408,11 @@
 
       console.log(url);
 
-      request = $.ajax(
+      if (request_heatmap != null) {
+           request_heatmap.abort();
+      };
+
+      request_heatmap = $.ajax(
         {
           type: 'GET',
           url: url,
@@ -321,30 +421,51 @@
       );
     }
 
+    var request_submit_kiosks = null;
+    $("#createAnimationForm").submit(function(e) {
+      e.preventDefault();
+      submitKiosks();
+    });
+
+    function handleSubmitKiosk() {
+      alert("Animation is created");
+    }
+
     function submitKiosks() {
-      city_name = encodeURIComponent("test");
+      var lst_marker_latlngs = [];
+      for (let key in markers) {
+        latlng = markers[key].getLatLng();
+        lst_marker_latlngs.push([latlng.lat, latlng.lng]);
+      }
+      city_name = encodeURIComponent(locality_name);
       county_name = encodeURIComponent(county_name);
       state_name = encodeURIComponent(state_name);
       url_path = encodeURIComponent(url_path);
-      list_kiosks = encodeURIComponent(list_kiosks);
       center_lng_lat = encodeURIComponent(center_lng_lat);
+      lst_marker_latlngs = encodeURIComponent(lst_marker_latlngs);
+      console.log(routes_dict);
+      let routes_dict_converted_to_lst = [];
+      for (let key in routes_dict) {
+        routes_dict_converted_to_lst.push([key.replaceAll(",",":"), "latlngs", routes_dict[key]["latlngs"], "distance", routes_dict[key]["distance"], "duration", routes_dict[key]["duration"]]);
+      }
 
-      var url = '/create_animation?city_name=' + city_name
+      console.log(routes_dict_converted_to_lst);
+
+      var url = '/create_simulation?city_name=' + city_name
         + '&county_name=' + county_name
         + '&state_name=' + state_name
         + '&url_path=' + url_path
-        + '&list_kiosks=' + list_kiosks
         + '&center_lng_lat=' + center_lng_lat
+        + '&lst_latlngs=' + lst_marker_latlngs
+        + '&routes_dict_converted_to_lst=' + routes_dict_converted_to_lst
 
       console.log(url);
 
-      request = $.ajax(
+      request_submit_kiosks = $.ajax(
         {
-          type: 'GET',
+          type: 'POST',
           url: url,
-          success: function (response) {
-            document.write(response);
-          }
+          success: handleSubmitKiosk
         }
       );
     }
@@ -355,161 +476,6 @@
 
     L.control.scale().addTo(mymap);
 
-
-
-    // // Beginning of Virtual grid code
-    // L.VirtualGrid = L.FeatureGroup.extend({
-    //   include: L.Mixin.Events,
-    //   options: {
-    //     cellSize: 222,
-    //     delayFactor: 2.5,
-    //     style: {
-    //       stroke: true,
-    //       color: '#3ac1f0',
-    //       dashArray: null,
-    //       lineCap: null,
-    //       lineJoin: null,
-    //       weight: 2,
-    //       opacity: 1,
-
-    //       fill: true,
-    //       fillColor: null, //same as color by default
-    //       fillOpacity: 0,
-
-    //       clickable: false
-    //     }
-    //   },
-    //   initialize: function(options){
-    //     L.Util.setOptions(this, options);
-    //     L.FeatureGroup.prototype.initialize.call(this, [], options);
-    //   },
-    //   onAdd: function(mymap){
-    //     L.FeatureGroup.prototype.onAdd.call(this, mymap);
-    //     this._map = mymap;
-    //     this._cells = [];
-    //     this._setupGrid(mymap.getBounds());
-    //   },
-    //   onRemove: function(mymap){
-    //     L.FeatureGroup.prototype.onRemove.call(this, mymap);
-    //   },
-
-    //   _clearLayer: function(e) {
-    //     this._cells = [];
-    //   },
-    //   _moveHandler: function(e){
-    //     this._renderCells(e.target.getBounds());
-    //   },
-    //   _dchandler: function(e) {
-    //     this.clearLayers();
-    //   },
-    //   _zoomHandler: function(e){
-    //     this.clearLayers();
-    //   },
-    //   _renderCells: function(bounds) {
-    //     var cells = this._cellsInBounds(bounds);
-    //     this.fire("newcells", cells);
-    //     for (var i = cells.length - 1; i >= 0; i--) {
-    //       var cell = cells[i];
-    //       if(this._loadedCells.indexOf(cell.id) === -1){
-    //         (function(cell, i){
-    //           setTimeout(this.addLayer.bind(this, L.rectangle(cell.bounds, this.options.style)), this.options.delayFactor*i);
-    //         }.bind(this))(cell, i);
-    //         this._loadedCells.push(cell.id);
-    //       }
-    //     }
-    //   },
-    //   _resizeHandler: function(e) {
-    //     this._setupSize();
-    //   },
-    //   _setupSize: function(){
-    //     this._rows = Math.ceil(this._map.getSize().x / this._cellSize);
-    //     this._cols = Math.ceil(this._map.getSize().y / this._cellSize);
-    //   },
-    //   _setupGrid: function(bounds){
-    //     this._origin = this._map.project(bounds.getNorthWest());
-    //     this._cellSize = this.options.cellSize;
-    //     this._setupSize();
-    //     this._loadedCells = [];
-    //     this.clearLayers();
-    //     this._renderCells(bounds);
-    //   },
-    //   _cellPoint:function(row, col){
-    //     var x = this._origin.x + (row*this._cellSize);
-    //     var y = this._origin.y + (col*this._cellSize);
-    //     return new L.Point(x, y);
-    //   },
-    //   _cellExtent: function(row, col){
-    //     var swPoint = this._cellPoint(row, col);
-    //     var nePoint = this._cellPoint(row-1, col-1);
-    //     var sw = this._map.unproject(swPoint);
-    //     var ne = this._map.unproject(nePoint);
-    //     return new L.LatLngBounds(ne, sw);
-    //   },
-    //   _cellsInBounds: function(bounds){
-    //     var offset = this._map.project(bounds.getNorthWest());
-    //     var center = bounds.getCenter();
-    //     var offsetX = this._origin.x - offset.x;
-    //     var offsetY = this._origin.y - offset.y;
-    //     var offsetRows = Math.round(offsetX / this._cellSize);
-    //     var offsetCols = Math.round(offsetY / this._cellSize);
-    //     var cells = [];
-    //     for (var i = 0; i <= this._rows; i++) {
-    //       for (var j = 0; j <= this._cols; j++) {
-    //         var row = i-offsetRows;
-    //         var col = j-offsetCols;
-    //         var cellBounds = this._cellExtent(row, col);
-    //         var cellId = row+":"+col;
-    //         cells.push({
-    //           id: cellId,
-    //           bounds: cellBounds,
-    //           distance:cellBounds.getCenter().distanceTo(center)
-    //         });
-    //       }
-    //     }
-    //     cells.sort(function (a, b) {
-    //       return a.distance - b.distance;
-    //     });
-    //     return cells;
-    //   }
-    // });
-
-
-
-
-
-
-    // NEW TESTING
-    var tiles = new L.GridLayer();
-    tiles.createTile = function (coords) {
-      var tile = L.DomUtil.create('canvas', 'leaflet-tile');
-      var ctx = tile.getContext('2d');
-      var size = this.getTileSize();
-      tile.width = size.x;
-      tile.height = size.y;
-
-      // calculate projection coordinates of top left tile pixel
-      var nwPoint = coords.scaleBy(size);
-
-      // calculate geographic coordinates of top left tile pixel
-      var nw = mymap.unproject(nwPoint, coords.z);
-
-      // ctx.fillStyle = 'white';
-      // ctx.fillRect(0, 0, size.x, 50);
-      ctx.fillStyle = 'black';
-      // ctx.fillText('x: ' + coords.x + ', y: ' + coords.y + ', zoom: ' + coords.z, 20, 20);
-      // ctx.fillText('lat: ' + nw.lat + ', lon: ' + nw.lng, 20, 40);
-      ctx.strokeStyle = 'red';
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(size.x - 1, 0);
-      ctx.lineTo(size.x - 1, size.y - 1);
-      ctx.lineTo(0, size.y - 1);
-      ctx.closePath();
-      ctx.stroke();
-      return tile;
-    }
-
-    tiles.addTo(mymap)
   </script>
 </body>
 
