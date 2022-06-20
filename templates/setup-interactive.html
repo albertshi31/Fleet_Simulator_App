@@ -47,6 +47,22 @@
       z-index: 1000;
     }
 
+<<<<<<< HEAD
+=======
+    #loading_heatmap {
+      left: 50%;
+      top: 10%;
+      transform: translate(-50%, -50%);
+      padding: 10px;
+      position: absolute;
+      background-color: rgba(255, 255, 255, 0.5);
+      z-index: 10000;
+      white-space: nowrap;
+      font-size: 200%;
+      border-radius: 15px;
+    }
+
+>>>>>>> 16e542cb80a12dbc07d397e144cccf175e1fdd42
     .panel {
       min-width: 30vw;
       max-height: 50vh;
@@ -91,6 +107,13 @@
       overflow: scroll;
     }
 
+<<<<<<< HEAD
+=======
+    .loading-icon {
+      z-index: 1000;
+      padding-top: 5px;
+    }
+>>>>>>> 16e542cb80a12dbc07d397e144cccf175e1fdd42
   </style>
 </head>
 
@@ -152,16 +175,22 @@
         <button type="button" class="btn btn-danger" onclick="resetAll()">Reset All</button>
         <button type="button" class="btn btn-info" onclick="toggleLayer()">Layer</button>
       </div>
+<<<<<<< HEAD
       <br> <br>
       <div class="loading-icon">
         <button class="btn btn-primary" type="button" disabled>
           <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
           Loading...
+=======
+      <div class="loading-icon" id="loading_heatmap_icon">
+        <button class="btn btn-primary" type="button" disabled>
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          Loading Heatmap...
+>>>>>>> 16e542cb80a12dbc07d397e144cccf175e1fdd42
         </button>
       </div>
     </div>
   </div>
-
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.0/heatmap.min.js" integrity="sha512-FpvmtV53P/z7yzv1TAIVH7PNz94EKXs5aV6ts/Zi+B/VeGU5Xwo6KIbwpTgKc0d4urD/BtkK50IC9785y68/AA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet-heatmap@1.0.0/leaflet-heatmap.min.js"></script>
@@ -307,6 +336,7 @@
       var heatmapLayer = new HeatmapOverlay(cfg);
       heatmapLayer.addTo(mymap);
       heatmapLayer.setData(heatmap_data);
+      $('#loading_heatmap_icon').hide();
     };
 
 
