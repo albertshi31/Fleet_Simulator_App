@@ -94,6 +94,11 @@
       max-width: 30vw;
       overflow: scroll;
     }
+
+    .loading-icon {
+      z-index: 1000;
+      padding-top: 5px;
+    }
   </style>
 </head>
 
@@ -153,9 +158,14 @@
         <button type="button" class="btn btn-danger" onclick="resetAll()">Reset All</button>
         <button type="button" class="btn btn-info" onclick="toggleLayer()">Layer</button>
       </div>
+      <div class="loading-icon" id="loading_heatmap_icon">
+        <button class="btn btn-primary" type="button" disabled>
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          Loading Heatmap...
+        </button>
+      </div>
     </div>
-  </div> 
-
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/heatmap.js/2.0.0/heatmap.min.js" integrity="sha512-FpvmtV53P/z7yzv1TAIVH7PNz94EKXs5aV6ts/Zi+B/VeGU5Xwo6KIbwpTgKc0d4urD/BtkK50IC9785y68/AA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet-heatmap@1.0.0/leaflet-heatmap.min.js"></script>
@@ -301,6 +311,7 @@
       var heatmapLayer = new HeatmapOverlay(cfg);
       heatmapLayer.addTo(mymap);
       heatmapLayer.setData(heatmap_data);
+      $('#loading_heatmap_icon').hide();
     };
 
 
