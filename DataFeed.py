@@ -11,10 +11,10 @@ from shapely.geometry.polygon import Polygon
 
 # Need to change to OFIPS instead of min/max lat/lon
 class DataFeed:
-    def __init__(self, depot_csv=None, lst_lnglats=None, lst_passenger_csv=None, modesplit=None):
-        self.depot_csv = depot_csv
-        self.polygon = Polygon(lst_lnglats)
-        self.lst_passenger_csv = lst_passenger_csv
+    def __init__(self, depot_csv_name, person_trips_in_kiosk_network, person_trips_csv_header, modesplit):
+        self.depot_csv_name = depot_csv_name
+        self.person_trips_in_kiosk_network = person_trips_in_kiosk_network
+        self.person_trips_csv_header = person_trips_csv_header
         self.modesplit = modesplit
         self.all_depots = []
         self.current_index_passenger_list = 0
@@ -24,7 +24,7 @@ class DataFeed:
         self.SEARCH_RADIUS = 8
 
     def parseDepots(self):
-        with open(self.depot_csv, 'r', encoding='utf-8-sig') as file:
+        with open(self.depot_csv_name, 'r', encoding='utf-8-sig') as file:
             csvreader = csv.reader(file)
             header = next(csvreader)
             name_idx = header.index("Name")
@@ -45,41 +45,28 @@ class DataFeed:
     def getDepots(self):
         return self.all_depots
 
-    def isInBounds(self, lat, lng, dest_lat, dest_lng):
-        point1 = Point(lng, lat)
-        point2 = Point(dest_lng, dest_lat)
-        return self.polygon.contains(point1) and self.polygon.contains(point2)
-
     def parsePassengers(self):
-        for filename in self.lst_passenger_csv:
-            with open(filename, 'r', encoding='utf-8-sig') as file:
-                csvreader = csv.reader(file)
-                header = next(csvreader)
-                lat_idx = header.index("OLat")
-                long_idx = header.index("OLon")
-                dest_lat_idx = header.index("DLat")
-                dest_long_idx = header.index("DLon")
-                departure_time_idx = header.index("ODepartureTime")
-                for row in csvreader:
-                    lat = float(row[lat_idx])
-                    lng = float(row[long_idx])
-                    dest_lat = float(row[dest_lat_idx])
-                    dest_lng = float(row[dest_long_idx])
-                    departure_time = int(row[departure_time_idx])
-                    if self.isInBounds(lat, lng, dest_lat, dest_lng):
-                        if random.choices([1, 0], weights=(self.modesplit, 100-self.modesplit))[0]:
-                            newPassenger = Passenger(lat,
-                                                    lng,
-                                                    dest_lat,
-                                                    dest_lng,
-                                                    departure_time,
-                                                    random.choice([0, 1, 2]))
-                            # for resolution in [8, 7, 6, 5]:
-                            #     h3_index_origin = h3.geo_to_h3(lat, lng, resolution)
-                            #     newPassenger.lst_h3_indices_origin.append(h3_index_origin)
-                            #     h3_index_destination = h3.geo_to_h3(lat, lng, resolution)
-                            #     newPassenger.lst_h3_indices_destination.append(h3_index_destination)
-                            self.all_passengers.append(newPassenger)
+        lat_idx = self.person_trips_csv_header.index("OLat")
+        lng_idx = self.person_trips_csv_header.index("OLon")
+        dlat_idx = self.person_trips_csv_header.index("DLat")
+        dlon_idx = self.person_trips_csv_header.index("DLon")
+        departure_time_idx = self.person_trips_csv_header.index("ODepartureTime")
+
+        for row in self.person_trips_in_kiosk_network:
+            lat = float(row[lat_idx])
+            lng = float(row[lng_idx])
+            dest_lat = float(row[dlat_idx])
+            dest_lng = float(row[dlon_idx])
+            departure_time = int(row[departure_time_idx])
+
+            if random.choices([1, 0], weights=(self.modesplit, 100-self.modesplit))[0]:
+                                newPassenger = Passenger(lat,
+                                                        lng,
+                                                        dest_lat,
+                                                        dest_lng,
+                                                        departure_time,
+                                                        random.choice([0, 1, 2]))
+                                self.all_passengers.append(newPassenger)
 
         # Sort passengers by departure_time
         self.all_passengers.sort(key=lambda pax: pax.departure_time)
