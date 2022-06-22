@@ -296,10 +296,36 @@ def prepare_simulation():
 
         global person_trips_in_kiosk_network
         global person_trips_csv_header
-        response = create_animation(CITY_NAME, depot_data_filename, person_trips_in_kiosk_network, person_trips_csv_header, modesplit, lst_fleetsize)
+
+        create_animation_dict = {
+            'CITY_NAME': CITY_NAME,
+            'depot_data_filename': depot_data_filename,
+            'person_trips_in_kiosk_network': person_trips_in_kiosk_network,
+            'person_trips_csv_header': person_trips_csv_header,
+            'modesplit': modesplit,
+            'lst_fleetsize': lst_fleetsize
+        }
+
+        saveCreateAnimationDict(create_animation_dict)
+        response = create_animation(CITY_NAME)
         return response
 
-def create_animation(CITY_NAME, depot_data_filename, person_trips_in_kiosk_network, person_trips_csv_header, modesplit, lst_fleetsize):
+def saveCreateAnimationDict(create_animation_dict):
+    city_name = create_animation_dict['CITY_NAME']
+    with open("static/" + city_name + "/createanimationdict.csv", "w") as f:
+        json.dump(create_animation_dict, f)
+
+def create_animation(CITY_NAME):
+    with open("static/" + CITY_NAME + "/createanimationdict.csv", "r") as f:
+        create_animation_dict = json.load(f)
+
+    CITY_NAME = create_animation_dict['CITY_NAME']
+    depot_data_filename = create_animation_dict['depot_data_filename']
+    person_trips_in_kiosk_network = create_animation_dict['person_trips_in_kiosk_network']
+    person_trips_csv_header = create_animation_dict['person_trips_csv_header']
+    modesplit = create_animation_dict['modesplit']
+    lst_fleetsize = create_animation_dict['lst_fleetsize']
+
     start_time = time.time()
 
     # TODO: Allow users to choose these variables
@@ -443,6 +469,8 @@ def main(argv):
     print(args)
 
     if args.testing:
+        CITY_NAME = "TRENTON_TESTING"
+        create_animation(CITY_NAME)
         print("TEST")
     else:
         app.run(host="localhost", port=8000, debug=True)
