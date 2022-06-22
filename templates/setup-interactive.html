@@ -149,6 +149,7 @@
       </div>
       <div id="routenetwork">
         Number of road miles to map: <span id="num_road_miles"></span> <br>
+        Number of Trips Served by Kiosk Network: <span id="numTripsInKioskNetwork"></span> <br>
         <!-- Least Dense<input id="routenetworkdensityslider" type="range" oninput="renderRoutes(this.value)">Most Dense -->
         <div id="distancematrix"></div><br>
         <!-- <button type="button" class="btn btn-info" onclick="duration_table_view='minutes'; updateDurationTable()">In Seconds</button> <button type="button" class="btn btn-info" onclick="duration_table_view='miles'; updateDurationTable()">In Miles</button> -->
@@ -162,6 +163,12 @@
         <button class="btn btn-primary" type="button" disabled>
           <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
           Loading Heatmap...
+        </button>
+      </div>
+      <div class="loading-icon" id="loading_kiosks_icon">
+        <button class="btn btn-primary" type="button" disabled>
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          Loading Kiosks...
         </button>
       </div>
     </div>
@@ -229,7 +236,7 @@
 
         $("#city_name").val(locality_name+", "+state_name);
 
-        getHeatmap();
+        drawH3Polygons();
       },
       L: L,
     });
@@ -257,8 +264,8 @@
     }
 
 
-    function placeKiosk(e) {
-      if ($('#placeKiosksCheck').is(':checked')) {
+    function placeKiosk(e, automatic_placement = false) {
+      if ($('#placeKiosksCheck').is(':checked') || automatic_placement) {
         $('#routenetwork').show();
 
         var marker = L.marker(e.latlng, {
@@ -420,15 +427,96 @@
       renderRoutes();
     }
 
-    var request_heatmap = null;
-    function getHeatmap() {
+    function drawPrecalculatedKiosksSuccess(response) {
+      $('#loading_kiosks_icon').hide();
+      console.log(response);
+      var arrayLength = response["lst_marker_latlngs"].length;
+      for (var i = 0; i < arrayLength; i++) {
+        latlng = response["lst_marker_latlngs"][i];
+        placeKiosk({latlng: {lat: latlng[0], lng: latlng[1]}}, true);
+      }
+    }
+
+    var request_draw_precalculated_kiosks = null;
+    function drawPrecalculatedKiosks() {
+
+      var url = '/draw_precalculated_kiosks'
+
+      console.log(url);
+
+      if (request_draw_precalculated_kiosks != null) {
+           request_draw_precalculated_kiosks.abort();
+      };
+
+      request_draw_precalculated_kiosks = $.ajax(
+        {
+          type: 'GET',
+          url: url,
+          success: drawPrecalculatedKiosksSuccess
+        }
+      );
+    }
+
+
+    function drawH3PolygonsSuccess(response) {
+      var h3Grid = L.polygon(response["lst_polygons"], {color: 'orange'}).addTo(mymap);
+      extractPersonTrips();
+    }
+
+    var request_draw_h3_polygons = null;
+    function drawH3Polygons() {
+      url_path = encodeURIComponent(url_path);
+
+      var url = '/draw_h3_polygons?url_path=' + url_path
+
+      console.log(url);
+
+      if (request_draw_h3_polygons != null) {
+           request_draw_h3_polygons.abort();
+      };
+
+      request_draw_h3_polygons = $.ajax(
+        {
+          type: 'POST',
+          url: url,
+          success: drawH3PolygonsSuccess
+        }
+      );
+    }
+
+    function extractPersonTripsSuccess(response) {
+      $('#numTripsInKioskNetwork').text(response["numTripsInKioskNetwork"]);
+      getHeatmap();
+      drawPrecalculatedKiosks();
+    }
+
+    var request_person_trips_extract = null;
+    function extractPersonTrips() {
       county_name = encodeURIComponent(county_name);
       state_name = encodeURIComponent(state_name);
-      bbox = encodeURIComponent(bbox);
+      //bbox = encodeURIComponent(bbox);
 
-      var url = '/get_heatmap?county_name=' + county_name
+      var url = '/extract_person_trip_files?county_name=' + county_name
         + '&state_name=' + state_name
-        + '&bbox=' + bbox
+
+      console.log(url);
+
+      if (request_person_trips_extract != null) {
+           request_person_trips_extract.abort();
+      };
+
+      request_person_trips_extract = $.ajax(
+        {
+          type: 'GET',
+          url: url,
+          success: extractPersonTripsSuccess
+        }
+      );
+    }
+
+    var request_heatmap = null;
+    function getHeatmap() {
+      var url = '/get_heatmap'
 
       console.log(url);
 
@@ -461,37 +549,27 @@
         latlng = markers[key].getLatLng();
         lst_marker_latlngs.push([latlng.lat, latlng.lng]);
       }
-      city_name = encodeURIComponent(locality_name);
-      county_name = encodeURIComponent(county_name);
-      state_name = encodeURIComponent(state_name);
-      url_path = encodeURIComponent(url_path);
-      center_lng_lat = encodeURIComponent(center_lng_lat);
-      lst_marker_latlngs = encodeURIComponent(lst_marker_latlngs);
-      console.log(routes_dict);
-      let routes_dict_converted_to_lst = [];
-      for (let key in routes_dict) {
-        routes_dict_converted_to_lst.push([key.replaceAll(",",":"), "latlngs", routes_dict[key]["latlngs"], "distance", routes_dict[key]["distance"], "duration", routes_dict[key]["duration"]]);
-      }
 
-      console.log(routes_dict_converted_to_lst);
+      var submitData = {
+        "city_name": locality_name,
+        "county_name": county_name,
+        "state_name": state_name,
+        "center_lng_lat": center_lng_lat,
+        "lst_marker_latlngs": lst_marker_latlngs,
+        "routes_dict": routes_dict,
+        "lst_fleetsize": $('#lst_fleetsize').val().split(','),
+        "modesplit": $('#modesplit').val()
+      };
 
-      var url = '/create_simulation?city_name=' + city_name
-        + '&county_name=' + county_name
-        + '&state_name=' + state_name
-        + '&url_path=' + url_path
-        + '&center_lng_lat=' + center_lng_lat
-        + '&lst_latlngs=' + lst_marker_latlngs
-        + '&routes_dict_converted_to_lst=' + routes_dict_converted_to_lst
+      console.log(submitData);
 
-      console.log(url);
-
-      request_submit_kiosks = $.ajax(
-        {
-          type: 'POST',
-          url: url,
-          success: handleSubmitKiosk
-        }
-      );
+      request_submit_kiosks = $.ajax({
+        type: "POST",
+        url: "/create_simulation",
+        data: JSON.stringify(submitData),
+        contentType: "application/json",
+        dataType: 'json'
+      });
     }
 
     mymap.on('click', placeKiosk);

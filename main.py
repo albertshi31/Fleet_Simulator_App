@@ -13,6 +13,7 @@ from DepotMatrixAndBuildings import DepotMatrixAndBuildings
 import h3
 from random import sample
 import polyline
+import numpy as np
 
 from Dispatcher import Dispatcher
 
@@ -21,6 +22,13 @@ THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
 global CITY_NAME
 CITY_NAME = ""
 global list_of_unzipped_files
+global person_trip_lst_latlngs
+global person_trips_in_kiosk_network
+global person_trips_csv_header
+global person_trip_lst_latlngs_by_h3_index
+global lst_h3_indices
+global h3_resolution
+h3_resolution = 8
 
 app = Flask("__main__", template_folder=os.path.join(THIS_FOLDER, "templates"))
 
@@ -54,7 +62,7 @@ def setup_interactive():
     return response
 
 # Extract zipped files that contain person trips within the county
-def extract_person_trip_files(county_name, state_name):
+def extract_person_trip_files_helper(county_name, state_name):
     af = addfips.AddFIPS()
     fips_code = af.get_county_fips(county_name, state=state_name)
     global THIS_FOLDER
@@ -75,41 +83,64 @@ def isInBoundsLatLng(lat, lng, min_lat, max_lat, min_lng, max_lng):
     result2 = lng >= min_lng and lng <= max_lng
     return result1 and result2
 
-def filter_person_trip_files(list_of_unzipped_files, min_lat, max_lat, min_lng, max_lng):
-    result_lst_latlngs = []
+def filter_person_trip_files(list_of_unzipped_files):
+    global person_trip_lst_latlngs
+    global person_trip_lst_latlngs_by_h3_index
+    person_trip_lst_latlngs_by_h3_index = {}
+    global lst_h3_indices
+    global h3_resolution
+    global person_trips_in_kiosk_network
+    global person_trips_csv_header
+    person_trips_in_kiosk_network = []
+    person_trip_lst_latlngs = []
     for filename in list_of_unzipped_files:
         with open(filename, 'r', encoding='utf-8-sig') as file:
             csvreader = csv.reader(file)
             header = next(csvreader)
+            person_trips_csv_header = header
             lat_idx = header.index("OLat")
             long_idx = header.index("OLon")
             dest_lat_idx = header.index("DLat")
             dest_long_idx = header.index("DLon")
+            gcdistance_idx = header.index("GCDistance")
             for row in csvreader:
                 lat = float(row[lat_idx])
                 lng = float(row[long_idx])
                 dest_lat = float(row[dest_lat_idx])
                 dest_lng = float(row[dest_long_idx])
-                if isInBoundsLatLng(lat, lng, min_lat, max_lat, min_lng, max_lng) and isInBoundsLatLng(dest_lat, dest_lng, min_lat, max_lat, min_lng, max_lng):
-                    result_lst_latlngs.append([lat, lng])
-                    result_lst_latlngs.append([dest_lat, dest_lng])
-    return result_lst_latlngs
+                gcdistance = float(row[gcdistance_idx])
+                origin_h3_index = h3.geo_to_h3(lat, lng, h3_resolution)
+                dest_h3_index = h3.geo_to_h3(dest_lat, dest_lng, h3_resolution)
+                if origin_h3_index in lst_h3_indices and dest_h3_index in lst_h3_indices and gcdistance > .5:
+                    person_trip_lst_latlngs.append([lat, lng])
+                    person_trip_lst_latlngs.append([dest_lat, dest_lng])
+                    person_trips_in_kiosk_network.append(row)
+                    if not origin_h3_index in person_trip_lst_latlngs_by_h3_index:
+                        person_trip_lst_latlngs_by_h3_index[origin_h3_index] = [[lat, lng]]
+                    else:
+                        person_trip_lst_latlngs_by_h3_index[origin_h3_index].append([lat, lng])
+                    if not dest_h3_index in person_trip_lst_latlngs_by_h3_index:
+                        person_trip_lst_latlngs_by_h3_index[dest_h3_index] = [[dest_lat, dest_lng]]
+                    else:
+                        person_trip_lst_latlngs_by_h3_index[dest_h3_index].append([dest_lat, dest_lng])
+
 
 def getRouteMeta(latlng1, latlng2):
     loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
     url = "http://127.0.0.1:5000/route/v1/driving/"
-    r = requests.get(url + loc + "?overview=full&steps=true")
+    r = requests.get(url + loc + "?overview=full&annotations=true")
     if r.status_code != 200:
         print("ERROR")
         return {}
     res = r.json()
-    test_duration = 0
-    for step in res['routes'][0]['legs'][0]['steps']:
-        test_duration += step['duration']
+    raw_timestamps = res['routes'][0]['legs'][0]['annotation']['duration']
+    raw_timestamps.insert(0, 0) # raw_timestamps gives list of times you should add to previous sum
+    route_timestamps = list(np.cumsum(raw_timestamps))
+
     route_latlngs = polyline.decode(res['routes'][0]['geometry'])
     route_distance = res['routes'][0]['distance']
     route_duration = res['routes'][0]['duration']
-    return route_latlngs, route_distance, route_duration
+    return route_latlngs, route_distance, route_duration, route_timestamps
 
 def getNearestStreetCoordinate(latlng1):
     loc = "{},{}".format(latlng1[1], latlng1[0])
@@ -128,29 +159,22 @@ def get_routes():
     lst_latlngs = [[float(lat), float(lon)] for lat, lon in [lst_latlngs[x:x+2] for x in range(0, len(lst_latlngs), 2)]]
     new_marker_lat, new_marker_lng = request.args.get('new_marker').split(',')
     new_marker_lat_lng = [float(new_marker_lat), float(new_marker_lng)]
-    #graph = Graph(len(lst_latlngs))
     for lat_lng in lst_latlngs:
         if not lat_lng == new_marker_lat_lng:
             str_new_marker_lat_lng = ','.join(str(x) for x in new_marker_lat_lng)
             str_lat_lng = ','.join(str(x) for x in lat_lng)
-            route_latlngs, route_distance, route_duration = getRouteMeta(new_marker_lat_lng, lat_lng)
-            route_metas['{};{}'.format(str_new_marker_lat_lng, str_lat_lng)] = {'latlngs': route_latlngs, 'distance': route_distance, 'duration': route_duration}
-            route_latlngs, route_distance, route_duration = getRouteMeta(lat_lng, new_marker_lat_lng)
-            route_metas['{};{}'.format(str_lat_lng, str_new_marker_lat_lng)] = {'latlngs': route_latlngs, 'distance': route_distance, 'duration': route_duration}
-            #graph.addEdge(idx1, idx2, route_duration)
-
-    #sorted_route_metas = graph.getAllSortedRoutes(route_metas)
-    print(route_metas)
+            route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(new_marker_lat_lng, lat_lng)
+            route_metas['{};{}'.format(str_new_marker_lat_lng, str_lat_lng)] = {'latlngs': route_latlngs, 'distance': route_distance, 'duration': route_duration, 'timestamps': route_timestamps}
+            route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(lat_lng, new_marker_lat_lng)
+            route_metas['{};{}'.format(str_lat_lng, str_new_marker_lat_lng)] = {'latlngs': route_latlngs, 'distance': route_distance, 'duration': route_duration, 'timestamps': route_timestamps}
     return route_metas
 
-@app.route("/get_heatmap")
-def get_heatmap():
+@app.route("/extract_person_trip_files")
+def extract_person_trip_files():
     county_name = request.args.get('county_name')
     state_name = request.args.get('state_name')
-    min_lng, min_lat, max_lng, max_lat = [float(elem) for elem in request.args.get('bbox').split(',')]
-    print(min_lng, min_lat, max_lng, max_lat)
 
-    extract_person_trip_files(county_name, state_name)
+    extract_person_trip_files_helper(county_name, state_name)
 
     global list_of_unzipped_files
 
@@ -158,10 +182,16 @@ def get_heatmap():
     for trip_data_csv in list_of_unzipped_files:
         input_datafeed_trip_data.append("local_static/" + trip_data_csv)
 
-    lst_latlngs = filter_person_trip_files(input_datafeed_trip_data, min_lat, max_lat, min_lng, max_lng)
+    filter_person_trip_files(input_datafeed_trip_data)
+    global person_trips_in_kiosk_network
+    return { "numTripsInKioskNetwork": len(person_trips_in_kiosk_network) }
 
+
+@app.route("/get_heatmap")
+def get_heatmap():
+    global person_trip_lst_latlngs
     h3_dict = {}
-    for lat, lng in lst_latlngs:
+    for lat, lng in person_trip_lst_latlngs:
         h3_index = h3.geo_to_h3(lat, lng, 14) # Larger means more granular heatmap
         if h3_index in h3_dict:
             h3_dict[h3_index] += 1
@@ -181,80 +211,104 @@ def get_heatmap():
     return heatmap_data
 
 
-# Very delicate structure!
-def parseDepotMatrix(routes_dict_converted_to_lst):
-    depot_matrix = {}
-    i = 0
-    while i < len(routes_dict_converted_to_lst):
-        key = routes_dict_converted_to_lst[i]
-        lst_latlngs = []
-        i += 2
-        while routes_dict_converted_to_lst[i] != "distance":
-            latlng = [float(routes_dict_converted_to_lst[i]), float(routes_dict_converted_to_lst[i+1])]
-            lst_latlngs.append(latlng)
-            i += 2
-        i += 1
-        distance = float(routes_dict_converted_to_lst[i])
-        i += 2
-        duration = float(routes_dict_converted_to_lst[i])
-        i += 1
-        depot_matrix[key] = {"route_latlngs": lst_latlngs, "route_distance": distance, "route_duration": duration}
-    return depot_matrix
+@app.route("/draw_h3_polygons", methods=['POST'])
+def draw_h3_polygons():
+    url_path = request.args.get('url_path')
+    print('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/' + url_path)
+    r = requests.get('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/' + url_path)
+    geojson = {"type":r.json()['geometry']['type'],
+               "coordinates":r.json()['geometry']['coordinates']}
+    global lst_h3_indices
+    global h3_resolution
+    lst_h3_indices = h3.polyfill(geojson, h3_resolution, geo_json_conformant=True) # res of 8 gives roughly ..25 mi^2 area hexagons
+    print(lst_h3_indices)
+    lst_polygons = []
+    for h3_index in lst_h3_indices:
+        lst_polygons.append([h3.h3_to_geo_boundary(h3_index)])
+    print(lst_polygons)
+    return { "lst_polygons": lst_polygons }
 
+
+@app.route("/draw_precalculated_kiosks")
+def draw_precalculated_kiosks():
+    lst_marker_latlngs = []
+    global person_trip_lst_latlngs_by_h3_index
+    print("person_trip_lst_latlngs_by_h3_index")
+    print(person_trip_lst_latlngs_by_h3_index)
+    for key, lst_latlngs in person_trip_lst_latlngs_by_h3_index.items():
+        average_lat = 0
+        average_lng = 0
+        for lat, lng in lst_latlngs:
+            average_lat += lat
+            average_lng += lng
+        average_lat /= len(lst_latlngs)
+        average_lng /= len(lst_latlngs)
+        lst_marker_latlngs.append([average_lat, average_lng])
+    print("lst_marker_latlngs")
+    print(lst_marker_latlngs)
+    return { "lst_marker_latlngs": lst_marker_latlngs }
 
 @app.route("/create_simulation", methods=['POST'])
 def create_animation():
-    CITY_NAME = request.args.get('city_name')
-    county_name = request.args.get('county_name')
-    state_name = request.args.get('state_name')
-    url_path = request.args.get('url_path')
-    lst_latlngs = request.args.get('lst_latlngs').split(',')
-    lst_latlngs = [[float(lat), float(lon)] for lat, lon in [lst_latlngs[x:x+2] for x in range(0, len(lst_latlngs), 2)]]
-    center_lng_lat = [float(elem) for elem in request.args.get('center_lng_lat').split(',')]
-    routes_dict_converted_to_lst = request.args.get('routes_dict_converted_to_lst').split(',')
-    depot_matrix = parseDepotMatrix(routes_dict_converted_to_lst)
+    received_data = request.get_json()
 
-    print(depot_matrix)
-    print(CITY_NAME, county_name, state_name, url_path, lst_latlngs, center_lng_lat)
+    CITY_NAME = received_data['city_name']
+    CITY_NAME = "TRENTON_TESTING"
+    county_name = received_data['county_name']
+    state_name = received_data['state_name']
+    center_lng_lat = received_data['center_lng_lat']
+    lst_latlngs = received_data['lst_marker_latlngs']
+    depot_matrix = received_data['routes_dict']
+    lst_fleetsize = [int(elem) for elem in received_data['lst_fleetsize']]
+    modesplit = float(received_data['modesplit'])
+    print(CITY_NAME, county_name, state_name, center_lng_lat, lst_latlngs)
 
-    depot_data_filename = CITY_NAME+state_name+"_AV_Station.csv"
-    fields = ["Name", "Lat", "Long"]
-    with open(os.path.join(THIS_FOLDER, "local_static", depot_data_filename), 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        csvwriter.writerow(fields)
-        csvwriter.writerows(list_kiosks)
-
-    r = requests.get('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/' + url_path)
-    lst_lnglats = r.json()['geometry']['coordinates'][0]
+    # IS THIS NECESSARY? We get errors trying to render empty routes in the setup page
+    for latlng in lst_latlngs:
+        str_lat_lng = ','.join(str(x) for x in latlng)
+        depot_matrix['{};{}'.format(str_lat_lng, str_lat_lng)] = {'latlngs': [latlng, latlng], 'distance': 0, 'duration': 0, 'timestamps': [0]}
 
     # Make the CITY_NAME folder to store files inside
     shutil.rmtree(os.path.join(THIS_FOLDER, "static", CITY_NAME), ignore_errors=True)
     os.mkdir(os.path.join(THIS_FOLDER, "static", CITY_NAME))
 
+    depot_data_filename = CITY_NAME+state_name+"_AV_Station.csv"
+    COL_FIELDS = ["Name", "Lat", "Long"]
+    with open(os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename), 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(COL_FIELDS)
+        csvwriter.writerows([[idx, latlng[0], latlng[1]] for idx, latlng in enumerate(lst_latlngs)]) # Switch this to kiosks with names
+
     # Create Depot Matrix and Depot Building Objects for Visualization
-    a = DepotMatrixAndBuildings(os.path.join(THIS_FOLDER, "local_static", depot_data_filename), CITY_NAME)
-    a.createDepotMatrix()
-    a.createDepotBuildings(50, 0.0002)
+    with open("static/" + CITY_NAME + "/depotmatrix.csv", "w") as f:
+        json.dump(depot_matrix, f)
+
+    offset = 0.0002
+    height = 50
+    buildings = []
+    for depot in lst_latlngs:
+        polygon = [[depot[0]-offset, depot[0]+offset],
+                   [depot[0]+offset, depot[0]+offset],
+                   [depot[0]+offset, depot[0]-offset],
+                   [depot[0]-offset, depot[0]-offset]]
+        polygon = [[elem[1], elem[0]] for elem in polygon]
+        buildings.append({"height": height, "polygon": polygon, "m": "Depot"})
+
+    with open("static/" + CITY_NAME + "/depotbuildings.csv", "w") as f:
+        json.dump(buildings, f)
 
     start_time = time.time()
-    input_datafeed_depot_data = os.path.join(THIS_FOLDER, "local_static", depot_data_filename)
-    input_datafeed_trip_data = []
-    global list_of_unzipped_files
-    for trip_data_csv in list_of_unzipped_files:
-        input_datafeed_trip_data.append("local_static/" + trip_data_csv)
 
     # TODO: Allow users to choose these variables
-    modesplit = 10
     angry_passenger_threshold_sec = 300
-    lst_fleetsize = [100]
-
-    print(input_datafeed_trip_data)
-    print("MODESPLIT:", modesplit)
 
     lst_passengers_left = []
 
+    global person_trips_csv_header
     aDispatcher = Dispatcher(CITY_NAME, angry_passenger_threshold_sec)
-    aDispatcher.createDataFeed(input_datafeed_depot_data, lst_lnglats, input_datafeed_trip_data, modesplit)
+    depot_csv_name = os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename)
+    aDispatcher.createDataFeed(depot_csv_name, person_trips_in_kiosk_network, person_trips_csv_header, modesplit)
+
 
     for idx, fleetsize in enumerate(lst_fleetsize):
         print("Fleetsize:", fleetsize)

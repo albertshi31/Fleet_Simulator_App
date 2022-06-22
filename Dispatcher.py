@@ -30,9 +30,8 @@ class Dispatcher:
         self.leave_after_wait_time_sec = angry_passenger_threshold_sec
         self.VEHICLE_REPOSITIONING_INTERVAL = 100
 
-    def createDataFeed(self, depot_csv=None, lst_lnglats=None, lst_passenger_csv=None, modesplit=None):
-        print(lst_passenger_csv)
-        self.DataFeed = DataFeed(depot_csv, lst_lnglats, lst_passenger_csv, modesplit)
+    def createDataFeed(self, depot_data_filename, person_trips_in_kiosk_network, person_trips_csv_header, modesplit):
+        self.DataFeed = DataFeed(depot_data_filename, person_trips_in_kiosk_network, person_trips_csv_header, modesplit)
         self.DataFeed.parsePassengers()
         self.DataFeed.parseDepots()
 
@@ -69,19 +68,19 @@ class Dispatcher:
 
     def create_list(self, passengers, starting_depot, ending_depot, matrix):
         ret_list = []
-        remaining_dests = []
+        remaining_dests = [starting_depot]
         for pax in passengers:
             remaining_dests.append(pax.dest_depot)
         ret_list.append(starting_depot)
         curr = starting_depot
         while remaining_dests:
             distances = []
-            for i in range(remaining_dests):
-                currdist = matrix["{},{};{},{}".format(curr.lat, curr.lon, remaining_dests[i].lat, remaining_dests[i].lon)]["route_distance"]
+            for i in range(len(remaining_dests)):
+                currdist = matrix["{},{};{},{}".format(curr.lat, curr.lon, remaining_dests[i].lat, remaining_dests[i].lon)]["distance"]
                 distances.append(currdist)
 
             remaining_dests.remove(curr)
-            curr = remaining_dests(np.argmin(distances))
+            curr = remaining_dests[np.argmin(distances)]
             ret_list.append(curr)
         if ending_depot:
             ret_list.append(ending_depot)
@@ -105,15 +104,15 @@ class Dispatcher:
         # Looks like calculating route section by section to calculate statistics
         for _, pair in enumerate(list(zip(lst_locations, lst_locations[1:]))):
             entry = matrix["{},{};{},{}".format(pair[0].lat, pair[0].lon, pair[1].lat, pair[1].lon)]
-            trip_latlngs = entry["route_latlngs"]
+            trip_latlngs = entry["latlngs"]
             trip_latlngs = [[elem[1], elem[0]] for elem in trip_latlngs] # DeckGL requires coords in (lon,lat) format
             trip_timestamps = [x+start_time+trip_duration for x in entry["timestamps"]]
-            trip_distance += entry["route_distance"]
+            trip_distance += entry["distance"]
             # Used for trips animations
             new_entry = {"vendor": num_passengers, "path": trip_latlngs, "timestamps": trip_timestamps, "distance": trip_distance}
             trips.append(new_entry)
 
-            trip_duration += entry["route_duration"]
+            trip_duration += entry["duration"]
 
             num_passengers_exiting_vehicle_at_this_stop = 0
             for pax in passengers:
@@ -136,7 +135,7 @@ class Dispatcher:
         # Update passenger values
         for pax in passengers:
             pax.distance_in_rideshare = distances["{},{}".format(pax.dest_depot.lat, pax.dest_depot.lon)]
-            pax.distance_if_taken_alone = matrix["{},{};{},{}".format(starting_depot.lat, starting_depot.lon, pax.dest_depot.lat, pax.dest_depot.lon)]["route_distance"]
+            pax.distance_if_taken_alone = matrix["{},{};{},{}".format(starting_depot.lat, starting_depot.lon, pax.dest_depot.lat, pax.dest_depot.lon)]["distance"]
             #assert (pax.distance_if_taken_alone <= pax.distance_in_rideshare) FIGURE OUT WHY THIS ISN'T WORKING
         return trip_duration, lst_locations[-1]
 
