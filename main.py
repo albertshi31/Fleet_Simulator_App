@@ -1,5 +1,7 @@
 from flask import Flask, render_template, make_response, request, redirect, url_for
 import requests
+from sys import argv, stderr, exit
+import argparse
 import json
 import os
 import time
@@ -221,11 +223,9 @@ def draw_h3_polygons():
     global lst_h3_indices
     global h3_resolution
     lst_h3_indices = h3.polyfill(geojson, h3_resolution, geo_json_conformant=True) # res of 8 gives roughly ..25 mi^2 area hexagons
-    print(lst_h3_indices)
     lst_polygons = []
     for h3_index in lst_h3_indices:
         lst_polygons.append([h3.h3_to_geo_boundary(h3_index)])
-    print(lst_polygons)
     return { "lst_polygons": lst_polygons }
 
 
@@ -233,8 +233,6 @@ def draw_h3_polygons():
 def draw_precalculated_kiosks():
     lst_marker_latlngs = []
     global person_trip_lst_latlngs_by_h3_index
-    print("person_trip_lst_latlngs_by_h3_index")
-    print(person_trip_lst_latlngs_by_h3_index)
     for key, lst_latlngs in person_trip_lst_latlngs_by_h3_index.items():
         average_lat = 0
         average_lng = 0
@@ -244,59 +242,64 @@ def draw_precalculated_kiosks():
         average_lat /= len(lst_latlngs)
         average_lng /= len(lst_latlngs)
         lst_marker_latlngs.append([average_lat, average_lng])
-    print("lst_marker_latlngs")
-    print(lst_marker_latlngs)
     return { "lst_marker_latlngs": lst_marker_latlngs }
 
+
 @app.route("/create_simulation", methods=['POST'])
-def create_animation():
-    received_data = request.get_json()
+def prepare_simulation():
+        received_data = request.get_json()
 
-    CITY_NAME = received_data['city_name']
-    CITY_NAME = "TRENTON_TESTING"
-    county_name = received_data['county_name']
-    state_name = received_data['state_name']
-    center_lng_lat = received_data['center_lng_lat']
-    lst_latlngs = received_data['lst_marker_latlngs']
-    depot_matrix = received_data['routes_dict']
-    lst_fleetsize = [int(elem) for elem in received_data['lst_fleetsize']]
-    modesplit = float(received_data['modesplit'])
-    print(CITY_NAME, county_name, state_name, center_lng_lat, lst_latlngs)
+        CITY_NAME = received_data['city_name']
+        CITY_NAME = "TRENTON_TESTING"
+        county_name = received_data['county_name']
+        state_name = received_data['state_name']
+        center_lng_lat = received_data['center_lng_lat']
+        lst_latlngs = received_data['lst_marker_latlngs']
+        depot_matrix = received_data['routes_dict']
+        lst_fleetsize = [int(elem) for elem in received_data['lst_fleetsize']]
+        modesplit = float(received_data['modesplit'])
+        print(CITY_NAME, county_name, state_name, center_lng_lat, lst_latlngs)
 
-    # IS THIS NECESSARY? We get errors trying to render empty routes in the setup page
-    for latlng in lst_latlngs:
-        str_lat_lng = ','.join(str(x) for x in latlng)
-        depot_matrix['{};{}'.format(str_lat_lng, str_lat_lng)] = {'latlngs': [latlng, latlng], 'distance': 0, 'duration': 0, 'timestamps': [0]}
+        # IS THIS NECESSARY? We get errors trying to render empty routes in the setup page
+        for latlng in lst_latlngs:
+            str_lat_lng = ','.join(str(x) for x in latlng)
+            depot_matrix['{};{}'.format(str_lat_lng, str_lat_lng)] = {'latlngs': [latlng, latlng], 'distance': 0, 'duration': 0, 'timestamps': [0]}
 
-    # Make the CITY_NAME folder to store files inside
-    shutil.rmtree(os.path.join(THIS_FOLDER, "static", CITY_NAME), ignore_errors=True)
-    os.mkdir(os.path.join(THIS_FOLDER, "static", CITY_NAME))
+        # Make the CITY_NAME folder to store files inside
+        shutil.rmtree(os.path.join(THIS_FOLDER, "static", CITY_NAME), ignore_errors=True)
+        os.mkdir(os.path.join(THIS_FOLDER, "static", CITY_NAME))
 
-    depot_data_filename = CITY_NAME+state_name+"_AV_Station.csv"
-    COL_FIELDS = ["Name", "Lat", "Long"]
-    with open(os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename), 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        csvwriter.writerow(COL_FIELDS)
-        csvwriter.writerows([[idx, latlng[0], latlng[1]] for idx, latlng in enumerate(lst_latlngs)]) # Switch this to kiosks with names
+        depot_data_filename = CITY_NAME+state_name+"_AV_Station.csv"
+        COL_FIELDS = ["Name", "Lat", "Long"]
+        with open(os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename), 'w', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(COL_FIELDS)
+            csvwriter.writerows([[idx, latlng[0], latlng[1]] for idx, latlng in enumerate(lst_latlngs)]) # Switch this to kiosks with names
 
-    # Create Depot Matrix and Depot Building Objects for Visualization
-    with open("static/" + CITY_NAME + "/depotmatrix.csv", "w") as f:
-        json.dump(depot_matrix, f)
+        # Create Depot Matrix and Depot Building Objects for Visualization
+        with open("static/" + CITY_NAME + "/depotmatrix.csv", "w") as f:
+            json.dump(depot_matrix, f)
 
-    offset = 0.0002
-    height = 50
-    buildings = []
-    for depot in lst_latlngs:
-        polygon = [[depot[0]-offset, depot[0]+offset],
-                   [depot[0]+offset, depot[0]+offset],
-                   [depot[0]+offset, depot[0]-offset],
-                   [depot[0]-offset, depot[0]-offset]]
-        polygon = [[elem[1], elem[0]] for elem in polygon]
-        buildings.append({"height": height, "polygon": polygon, "m": "Depot"})
+        offset = 0.0002
+        height = 50
+        buildings = []
+        for depot in lst_latlngs:
+            polygon = [[depot[0]-offset, depot[0]+offset],
+                       [depot[0]+offset, depot[0]+offset],
+                       [depot[0]+offset, depot[0]-offset],
+                       [depot[0]-offset, depot[0]-offset]]
+            polygon = [[elem[1], elem[0]] for elem in polygon]
+            buildings.append({"height": height, "polygon": polygon, "m": "Depot"})
 
-    with open("static/" + CITY_NAME + "/depotbuildings.csv", "w") as f:
-        json.dump(buildings, f)
+        with open("static/" + CITY_NAME + "/depotbuildings.csv", "w") as f:
+            json.dump(buildings, f)
 
+        global person_trips_in_kiosk_network
+        global person_trips_csv_header
+        response = create_animation(CITY_NAME, depot_data_filename, person_trips_in_kiosk_network, person_trips_csv_header, modesplit, lst_fleetsize)
+        return response
+
+def create_animation(CITY_NAME, depot_data_filename, person_trips_in_kiosk_network, person_trips_csv_header, modesplit, lst_fleetsize):
     start_time = time.time()
 
     # TODO: Allow users to choose these variables
@@ -304,7 +307,6 @@ def create_animation():
 
     lst_passengers_left = []
 
-    global person_trips_csv_header
     aDispatcher = Dispatcher(CITY_NAME, angry_passenger_threshold_sec)
     depot_csv_name = os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename)
     aDispatcher.createDataFeed(depot_csv_name, person_trips_in_kiosk_network, person_trips_csv_header, modesplit)
@@ -434,5 +436,17 @@ def graph_page():
     response = make_response(html)
     return response
 
+def main(argv):
+    parser = argparse.ArgumentParser(description='Create ODD and Simulate Trips')
+    parser.add_argument('-t', '--testing', type = bool, help="only test simulate trips", default=False)
+    args = parser.parse_args()
+    print(args)
+
+    if args.testing:
+        print("TEST")
+    else:
+        app.run(host="localhost", port=8000, debug=True)
+
 #Comment out before updating PythonAnywhere
-app.run(host="localhost", port=8000, debug=True)
+if __name__ == '__main__':
+    main(argv)

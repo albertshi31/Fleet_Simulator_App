@@ -68,7 +68,7 @@ class Dispatcher:
 
     def create_list(self, passengers, starting_depot, ending_depot, matrix):
         ret_list = []
-        remaining_dests = [starting_depot]
+        remaining_dests = []
         for pax in passengers:
             remaining_dests.append(pax.dest_depot)
         ret_list.append(starting_depot)
@@ -78,9 +78,8 @@ class Dispatcher:
             for i in range(len(remaining_dests)):
                 currdist = matrix["{},{};{},{}".format(curr.lat, curr.lon, remaining_dests[i].lat, remaining_dests[i].lon)]["distance"]
                 distances.append(currdist)
-
-            remaining_dests.remove(curr)
             curr = remaining_dests[np.argmin(distances)]
+            remaining_dests.remove(curr)
             ret_list.append(curr)
         if ending_depot:
             ret_list.append(ending_depot)
@@ -130,7 +129,7 @@ class Dispatcher:
             # Used for passenger metrics
             distances["{},{}".format(pair[1].lat, pair[1].lon)] = trip_distance
 
-        assert (num_passengers == 0), "Vehicle should have droppped off all passengers"
+        assert (num_passengers == 0), "Vehicle should have dropped off all passengers"
 
         # Update passenger values
         for pax in passengers:
