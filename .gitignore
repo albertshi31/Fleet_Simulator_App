@@ -1,5 +1,6 @@
 # Ignore certain large csv files
 local_static/
+!local_static/StateTripFiles_Compressed/34_NewJersey.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
