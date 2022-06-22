@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 class Dispatcher:
-    def __init__(self, city_name, angry_passenger_threshold_sec):
+    def __init__(self, city_name, angry_passenger_threshold_sec, depot_matrix):
         # Initialize all class variables
         self.num_vehicles = 0
         self.all_vehicle_list = []
@@ -29,6 +29,7 @@ class Dispatcher:
         self.city_name = city_name
         self.leave_after_wait_time_sec = angry_passenger_threshold_sec
         self.VEHICLE_REPOSITIONING_INTERVAL = 100
+        self.depot_matrix = depot_matrix
 
     def createDataFeed(self, depot_data_filename, person_trips_in_kiosk_network, person_trips_csv_header, modesplit):
         self.DataFeed = DataFeed(depot_data_filename, person_trips_in_kiosk_network, person_trips_csv_header, modesplit)
@@ -162,12 +163,7 @@ class Dispatcher:
         total_passengers = 0
         served_passengers = 0
         time_sec = 0
-
-        # Not sure?
-        THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
-        my_file = os.path.join(THIS_FOLDER, "static", self.city_name, "depotmatrix.csv")
-        with open(my_file, "r") as f:
-            matrix = json.load(f)
+        matrix = self.depot_matrix
 
         # Initializing empty variables
         trips = []

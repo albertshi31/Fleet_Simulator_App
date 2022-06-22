@@ -276,10 +276,7 @@ def prepare_simulation():
             csvwriter.writerow(COL_FIELDS)
             csvwriter.writerows([[idx, latlng[0], latlng[1]] for idx, latlng in enumerate(lst_latlngs)]) # Switch this to kiosks with names
 
-        # Create Depot Matrix and Depot Building Objects for Visualization
-        with open("static/" + CITY_NAME + "/depotmatrix.csv", "w") as f:
-            json.dump(depot_matrix, f)
-
+        # Create Depot Building Objects for Visualization
         offset = 0.0002
         height = 50
         buildings = []
@@ -291,7 +288,7 @@ def prepare_simulation():
             polygon = [[elem[1], elem[0]] for elem in polygon]
             buildings.append({"height": height, "polygon": polygon, "m": "Depot"})
 
-        with open("static/" + CITY_NAME + "/depotbuildings.csv", "w") as f:
+        with open("static/" + CITY_NAME + "/depotbuildings.json", "w") as f:
             json.dump(buildings, f)
 
         global person_trips_in_kiosk_network
@@ -300,6 +297,7 @@ def prepare_simulation():
         create_animation_dict = {
             'CITY_NAME': CITY_NAME,
             'depot_data_filename': depot_data_filename,
+            'depot_matrix': depot_matrix,
             'person_trips_in_kiosk_network': person_trips_in_kiosk_network,
             'person_trips_csv_header': person_trips_csv_header,
             'modesplit': modesplit,
@@ -312,15 +310,16 @@ def prepare_simulation():
 
 def saveCreateAnimationDict(create_animation_dict):
     city_name = create_animation_dict['CITY_NAME']
-    with open("static/" + city_name + "/createanimationdict.csv", "w") as f:
+    with open("static/" + city_name + "/createanimationdict.json", "w") as f:
         json.dump(create_animation_dict, f)
 
 def create_animation(CITY_NAME):
-    with open("static/" + CITY_NAME + "/createanimationdict.csv", "r") as f:
+    with open("static/" + CITY_NAME + "/createanimationdict.json", "r") as f:
         create_animation_dict = json.load(f)
 
     CITY_NAME = create_animation_dict['CITY_NAME']
     depot_data_filename = create_animation_dict['depot_data_filename']
+    depot_matrix = create_animation_dict['depot_matrix']
     person_trips_in_kiosk_network = create_animation_dict['person_trips_in_kiosk_network']
     person_trips_csv_header = create_animation_dict['person_trips_csv_header']
     modesplit = create_animation_dict['modesplit']
@@ -333,7 +332,7 @@ def create_animation(CITY_NAME):
 
     lst_passengers_left = []
 
-    aDispatcher = Dispatcher(CITY_NAME, angry_passenger_threshold_sec)
+    aDispatcher = Dispatcher(CITY_NAME, angry_passenger_threshold_sec, depot_matrix)
     depot_csv_name = os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename)
     aDispatcher.createDataFeed(depot_csv_name, person_trips_in_kiosk_network, person_trips_csv_header, modesplit)
 
@@ -409,7 +408,7 @@ def my_index():
     animation_speed = request.args.get('animation_speed', default = 1, type = int)
     start_time = request.args.get('start_time', default = 0, type = int)
 
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depotbuildings.csv")
+    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depotbuildings.json")
     with open(my_file, "r") as f:
         buildings = json.load(f)
 
