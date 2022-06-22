@@ -1,6 +1,7 @@
 from Passenger import Passenger
 from Vehicle import Vehicle
 from DataFeed import DataFeed
+from VehicleRoute import create_route
 import requests
 import time
 from geopy.distance import distance
@@ -67,33 +68,12 @@ class Dispatcher:
     #     closest_depot = self.DataFeed.all_depots[lst_distances.index(min(lst_distances))]
     #     return closest_depot
 
-    def create_list(self, passengers, starting_depot, ending_depot, matrix):
-        ret_list = []
-        remaining_dests = []
-        for pax in passengers:
-            remaining_dests.append(pax.dest_depot)
-        ret_list.append(starting_depot)
-        curr = starting_depot
-        while remaining_dests:
-            distances = []
-            for i in range(len(remaining_dests)):
-                currdist = matrix["{},{};{},{}".format(curr.lat, curr.lon, remaining_dests[i].lat, remaining_dests[i].lon)]["distance"]
-                distances.append(currdist)
-            curr = remaining_dests[np.argmin(distances)]
-            remaining_dests.remove(curr)
-            ret_list.append(curr)
-        if ending_depot:
-            ret_list.append(ending_depot)
-        return ret_list
 
     def routeVehicle(self, starting_depot, passengers, ending_depot, matrix, start_time, total_num_passengers, trips, num_active_passengers_decreases_over_time):
         # Creates list of locations that a specific vehicle will take (given all entered passangers)
-        lst_locations = self.create_list(passengers, starting_depot, ending_depot, matrix)
+        lst_locations = create_route(passengers, starting_depot, ending_depot, matrix)
 
-        lst_locations.insert(0, starting_depot)
-        if ending_depot:
-            lst_locations.append(ending_depot)
-            #print("THIS MEANS REPOSITIONING IS HAPPENING")
+       
         trip_latlngs = []
         distances = {}
         trip_distance = 0
@@ -129,7 +109,7 @@ class Dispatcher:
 
             # Used for passenger metrics
             distances["{},{}".format(pair[1].lat, pair[1].lon)] = trip_distance
-
+       
         assert (num_passengers == 0), "Vehicle should have dropped off all passengers"
 
         # Update passenger values
