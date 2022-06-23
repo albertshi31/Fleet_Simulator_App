@@ -21,8 +21,6 @@ from Dispatcher import Dispatcher
 
 global THIS_FOLDER
 THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
-global CITY_NAME
-CITY_NAME = ""
 global list_of_unzipped_files
 global person_trip_lst_latlngs
 global person_trips_in_kiosk_network
@@ -301,7 +299,8 @@ def prepare_simulation():
             'person_trips_in_kiosk_network': person_trips_in_kiosk_network,
             'person_trips_csv_header': person_trips_csv_header,
             'modesplit': modesplit,
-            'lst_fleetsize': lst_fleetsize
+            'lst_fleetsize': lst_fleetsize,
+            'center_lng_lat': center_lng_lat
         }
 
         saveCreateAnimationDict(create_animation_dict)
@@ -324,6 +323,7 @@ def create_animation(CITY_NAME):
     person_trips_csv_header = create_animation_dict['person_trips_csv_header']
     modesplit = create_animation_dict['modesplit']
     lst_fleetsize = create_animation_dict['lst_fleetsize']
+    center_lng_lat = create_animation_dict['center_lng_lat']
 
     start_time = time.time()
 
@@ -396,15 +396,16 @@ def create_animation(CITY_NAME):
 
             break
 
-    html = render_template("create_animation.html", run_time=time.time()-start_time)
-    response = make_response(html)
+    runtime=time.time()-start_time
+    response = {
+    'runtime': runtime
+    }
     return response
 
 @app.route("/animation")
 def my_index():
     global THIS_FOLDER
-    global CITY_NAME
-    CITY_NAME = request.args.get('city_choice', default = CITY_NAME)
+    CITY_NAME = request.args.get('city_choice')
     animation_speed = request.args.get('animation_speed', default = 1, type = int)
     start_time = request.args.get('start_time', default = 0, type = int)
 
