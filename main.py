@@ -471,9 +471,9 @@ def main(argv):
     if args.testing:
         CITY_NAME = "TRENTON_TESTING"
         create_animation(CITY_NAME)
-        print("TEST")
-    else:
-        app.run(host="localhost", port=8000, debug=True)
+
+    app.run(host="localhost", port=8000, debug=True)
+    # Go on http://localhost:8000/animation?city_choice=TRENTON_TESTING
 
 #Comment out before updating PythonAnywhere
 if __name__ == '__main__':
