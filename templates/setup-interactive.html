@@ -112,12 +112,11 @@
 </head>
 
 <body>
-    <!-- Modal -->
   <div class="modal fade" id="showSubmitModal" tabindex="-1" role="dialog" aria-labelledby="showSubmitModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
+          <h5 class="modal-title" id="exampleModalLabel">Create Simulation</h5>
           <button type="button" class="close" data-dismiss="modal" aria-label="Close">
             <span aria-hidden="true">&times;</span>
           </button>
@@ -146,15 +145,103 @@
         </div>
       </div>
     </div>
-
   </div>
+
+  <div class="modal fade" id="showPromptNewKioskModal" tabindex="-1" role="dialog" aria-labelledby="showPromptNewKioskModal" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Enter New Kiosk</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body" id="showPromptNewKioskModalBody">
+          <div class="form-group">
+          <form id="createNewKioskForm">
+              <label for="kiosk_name">Name</label>
+              <input id="kiosk_name" type="text" name="kiosk_name" required></input>
+              <br />
+
+              <label for="kiosk_category">Select Category</label>
+              <select class="form-control" id="kiosk_category">
+                <option>Residential</option>
+                <option>School</option>
+                <option>Commercial</option>
+              </select>
+
+              <label for="location">Location</label>
+              <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text" id="">Lat, Lng</span>
+                </div>
+                <input type="float" class="form-control" id="showPromptNewKioskModalBodyLat">
+                <input type="float" class="form-control" id="showPromptNewKioskModalBodyLng">
+              </div>
+
+              <button type="button" class="btn btn-info" onclick="selectKioskLocationOnMapHandler()">Select Location on Map</button>
+
+          </form>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button onclick="createNewKioskFormHandler()" class="btn btn-primary">Create Kiosk</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="showPromptEditKioskModal" tabindex="-1" role="dialog" aria-labelledby="showPromptEditKioskModal" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Edit Kiosk</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body" id="showPromptEditKioskModalBody">
+          <div class="form-group">
+          <form id="editKioskForm">
+              <label for="editKioskForm_kiosk_name">Name</label>
+              <input id="editKioskForm_kiosk_name" type="text" name="kiosk_name" required></input>
+              <br />
+
+              <label for="editKioskForm_kiosk_category">Select Category</label>
+              <select class="form-control" id="editKioskForm_kiosk_category">
+                <option>Residential</option>
+                <option>School</option>
+                <option>Commercial</option>
+              </select>
+
+              <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">Lat, Lng</span>
+                </div>
+                <input type="float" class="form-control" id="editKioskForm_lat">
+                <input type="float" class="form-control" id="editKioskForm_lng">
+              </div>
+
+              <button type="button" class="btn btn-info" onclick="editKioskLocationOnMapHandler()">Select Location on Map</button>
+
+          </form>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button onclick="editKioskFormHandler()" class="btn btn-primary">Edit Kiosk</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <div id="map">
   </div>
   <div class="container" id="kiosks">
     <div class="box">
-      <label for="placeKiosksCheck">Place Kiosks?</label>
-      <input type="checkbox" id="placeKiosksCheck"><br>
+      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#showPromptNewKioskModal">Add Kiosk</button>
       <div class="my-custom-scrollbar" id="listkiosks">
         <div class="panel-heading">List of Kiosks:</div>
       </div>
@@ -257,10 +344,35 @@
 
     var markers = {};
     var circles = {};
+    var kiosks = {};
 
     function moveToKiosk(marker_id) {
+      markers[marker_id].openPopup();
       mymap.setView(markers[marker_id].getLatLng());
     };
+
+    var editKiosk_marker_id;
+    function editKiosk(marker_id) {
+      kiosk_data = kiosks[marker_id];
+      $('#editKioskForm_kiosk_name').val(kiosk_data['name']);
+      $('#editKioskForm_kiosk_category').val(kiosk_data['category']);
+      $('#editKioskForm_lat').val(kiosk_data['lat']);
+      $('#editKioskForm_lng').val(kiosk_data['lng']);
+      $('#showPromptEditKioskModal').modal('show');
+      editKiosk_marker_id = marker_id;
+    };
+
+    function editKioskFormHandler() {
+      name = $('#editKioskForm_kiosk_name').val();
+      category = $('#editKioskForm_kiosk_category').val();
+      lat = parseFloat($('#editKioskForm_lat').val());
+      lng = parseFloat($('#editKioskForm_lng').val());
+      kiosks[editKiosk_marker_id] = {'name': name, 'category': category, 'lat': lat, 'lng': lng};
+      $('#name_'+editKiosk_marker_id).text(name);
+      $('#category_'+editKiosk_marker_id).text(category);
+      $('#loc_'+editKiosk_marker_id).text(lat.toFixed(5) + ";" + lng.toFixed(5));
+      $('#showPromptEditKioskModal').modal('hide');
+    }
 
     function deleteKiosk(marker_id) {
       mymap.removeLayer(markers[marker_id]);
@@ -274,36 +386,74 @@
       }
     }
 
+    function selectKioskLocationOnMapHandler() {
+      console.log("HELLO");
+      $('#showPromptNewKioskModal').modal('hide');
+      $('#kiosks').hide();
+      mymap.on('click', function (e) {
+        $('#showPromptNewKioskModalBodyLat').val(e.latlng.lat);
+        $('#showPromptNewKioskModalBodyLng').val(e.latlng.lng);
+        console.log(e.latlng);
+        $('#kiosks').show();
+        $('#showPromptNewKioskModal').modal('show');
+        mymap.off('click');
+      });
+    }
 
-    function placeKiosk(e, automatic_placement = false) {
-      if ($('#placeKiosksCheck').is(':checked') || automatic_placement) {
-        $('#routenetwork').show();
+    function editKioskLocationOnMapHandler() {
+      $('#showPromptEditKioskModal').modal('hide');
+      $('#kiosks').hide();
+      mymap.on('click', function (e) {
+        $('#editKioskForm_lat').val(e.latlng.lat);
+        $('#editKioskForm_lng').val(e.latlng.lng);
+        $('#kiosks').show();
+        $('#showPromptEditKioskModal').modal('show');
+        mymap.off('click');
+      });
+    }
 
-        var marker = L.marker(e.latlng, {
-          draggable: true,
-          autoPan: true,
-        }).addTo(mymap);
-        marker.on('drag', function(e){
-          circles[marker._leaflet_id].setLatLng(e.latlng);
-          $('#'+marker._leaflet_id).text(e.latlng.lat.toFixed(5) + ";" + e.latlng.lng.toFixed(5));
-        });
-        markers[marker._leaflet_id] = marker;
-        marker.on('dragend', function(e){
-          addMarker(markers, marker._leaflet_id);
-          console.log("Marker ID is " + marker._leaflet_id);
-        });
-        var circle = L.circle(e.latlng, {
-          color: 'red',
-          fillColor: '#f03',
-          fillOpacity: 0.3,
-          radius: 402.336 // 0.25 miles in meters
-        }).addTo(mymap);
-        circles[marker._leaflet_id] = circle;
+    function createNewKioskFormHandler() {
+      name = $('#kiosk_name').val();
+      category = $('#kiosk_category').val();
+      lat = parseFloat($('#showPromptNewKioskModalBodyLat').val());
+      lng = parseFloat($('#showPromptNewKioskModalBodyLng').val());
+      placeKiosk(name, category, lat, lng);
+      $('#showPromptNewKioskModal').modal('hide');
+    }
 
-        $("#listkiosks").append('<div class="panel-body" id="panel_'+marker._leaflet_id+'"><button type="button" class="btn btn-outline-info" onclick="moveToKiosk('+ marker._leaflet_id +')"><span id="' + marker._leaflet_id + '">' + e.latlng.lat.toFixed(5) + ";" + e.latlng.lng.toFixed(5) + '</span></button><button onclick="deleteKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-trash-can fa-lg"></i></button></div>');
 
+    function placeKiosk(name, category, lat, lng) {
+      $('#routenetwork').show();
+
+      var marker = L.marker([lat, lng], {
+        draggable: true,
+        autoPan: true,
+      }).addTo(mymap);
+
+      marker.bindPopup('<span id="name_' +marker._leaflet_id+ '"><b>Name:</b> '+ name +'</span><br /><span id="category_' +marker._leaflet_id+ '"><b>Category:</b> '+ category +'</span><br /><span id="loc_' + marker._leaflet_id + '"><b>Location:</b> ' + lat.toFixed(5) + ";" + lng.toFixed(5) + '</span>');
+
+      marker.on('drag', function(e){
+        circles[marker._leaflet_id].setLatLng([e.latlng.lat, e.latlng.lng]);
+        $('#loc_'+marker._leaflet_id).text(e.latlng.lat.toFixed(5) + ";" + e.latlng.lng.toFixed(5));
+        kiosks[marker._leaflet_id]['lat'] = e.latlng.lat;
+        kiosks[marker._leaflet_id]['lng'] = e.latlng.lng;
+      });
+      markers[marker._leaflet_id] = marker;
+      kiosks[marker._leaflet_id] = {'name': name, 'category': category, 'lat': lat, 'lng': lng};
+      marker.on('dragend', function(e){
         addMarker(markers, marker._leaflet_id);
-      }
+      });
+      var circle = L.circle([lat, lng], {
+        color: 'red',
+        fillColor: '#f03',
+        fillOpacity: 0.3,
+        radius: 402.336 // 0.25 miles in meters
+      }).addTo(mymap);
+      circles[marker._leaflet_id] = circle;
+
+      $("#listkiosks").append('<div class="panel-body" id="panel_'+marker._leaflet_id+'"><button type="button" class="btn btn-outline-info" onclick="moveToKiosk('+ marker._leaflet_id +')"><span id="name_' +marker._leaflet_id+ '"><b>Name:</b> '+ name +'</span><br /><span id="category_' +marker._leaflet_id+ '"><b>Category:</b> '+ category +'</span><br /><span id="loc_' + marker._leaflet_id + '"><b>Location:</b> ' + lat.toFixed(5) + ";" + lng.toFixed(5) + '</span></button><button onclick="editKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-pen-to-square fa-lg"></i></button><button onclick="deleteKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-trash-can fa-lg"></i></button></div>');
+
+      addMarker(markers, marker._leaflet_id);
     };
 
     function renderHeatmap(response) {
@@ -444,7 +594,7 @@
       var arrayLength = response["lst_marker_latlngs"].length;
       for (var i = 0; i < arrayLength; i++) {
         latlng = response["lst_marker_latlngs"][i];
-        placeKiosk({latlng: {lat: latlng[0], lng: latlng[1]}}, true);
+        placeKiosk(i.toString(), "unknown", latlng[0], latlng[1]);
       }
     }
 
@@ -584,7 +734,7 @@
       });
     }
 
-    mymap.on('click', placeKiosk);
+    //mymap.on('click', placeKiosk);
 
     mymap.zoomControl.setPosition('bottomright');
 

@@ -220,7 +220,7 @@ def draw_h3_polygons():
                "coordinates":r.json()['geometry']['coordinates']}
     global lst_h3_indices
     global h3_resolution
-    lst_h3_indices = h3.polyfill(geojson, h3_resolution, geo_json_conformant=True) # res of 8 gives roughly ..25 mi^2 area hexagons
+    lst_h3_indices = h3.polyfill(geojson, h3_resolution, geo_json_conformant=True) # res of 8 gives roughly .25 mi^2 area hexagons
     lst_polygons = []
     for h3_index in lst_h3_indices:
         lst_polygons.append([h3.h3_to_geo_boundary(h3_index)])
