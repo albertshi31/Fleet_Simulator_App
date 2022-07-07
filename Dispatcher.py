@@ -73,7 +73,7 @@ class Dispatcher:
         # Creates list of locations that a specific vehicle will take (given all entered passangers)
         lst_locations = create_route(passengers, starting_depot, ending_depot, matrix)
 
-       
+
         trip_latlngs = []
         distances = {}
         trip_distance = 0
@@ -109,7 +109,7 @@ class Dispatcher:
 
             # Used for passenger metrics
             distances["{},{}".format(pair[1].lat, pair[1].lon)] = trip_distance
-       
+
         assert (num_passengers == 0), "Vehicle should have dropped off all passengers"
 
         # Update passenger values
@@ -206,7 +206,7 @@ class Dispatcher:
                 if vehicle.active == False:
                     depot = vehicle.depot
                     if (len(depot.lst_passengers) > 0): # if there is a single passenger waiting to be served
-                        if (depot.lst_passengers[0].departure_time >= 5*60): # if first passenger to arrive waits at least 5 minutes
+                        if ((depot.lst_passengers[0].departure_time) >= 5*60): # if first passenger to arrive waits at least 5 minutes
                             passengers = depot.lst_passengers[:max_capacity]
                             num_passengers_in_car = len(passengers)
                             trip_duration, last_depot = self.routeVehicle(depot, passengers, None, matrix, time_sec, num_passengers_in_car, trips, num_active_passengers_decreases_over_time)

@@ -52,3 +52,117 @@ print(sum([0.6,1.1,1.1,0.8,0.9,4.3,7.1,0.8,0.8,0.6,0.7,0.9,1.1,0.8,0.5,0.4,0.4,0
 r = requests.get("http://127.0.0.1:5000/route/v1/driving/-74.74054768263326,40.239563894560966;-74.8063685988524,40.24031274875644?overview=full&annotations=true")
 res = r.json()
 print(res['routes'][0]['legs'][0]['annotation']['duration'])
+
+import json
+#six degrees of precision in valhalla
+inv = 1.0 / 1e6;
+
+#decode an encoded string
+def decode(encoded):
+  decoded = []
+  previous = [0,0]
+  i = 0
+  #for each byte
+  while i < len(encoded):
+    #for each coord (lat, lon)
+    ll = [0,0]
+    for j in [0, 1]:
+      shift = 0
+      byte = 0x20
+      #keep decoding bytes until you have this coord
+      while byte >= 0x20:
+        byte = ord(encoded[i]) - 63
+        i += 1
+        ll[j] |= (byte & 0x1f) << shift
+        shift += 5
+      #get the final value adding the previous offset and remember it for the next
+      ll[j] = previous[j] + (~(ll[j] >> 1) if ll[j] & 1 else (ll[j] >> 1))
+      previous[j] = ll[j]
+    #scale by the precision and chop off long coords also flip the positions so
+    #its the far more standard lon,lat instead of lat,lon
+    decoded.append([float('%.6f' % (ll[1] * inv)), float('%.6f' % (ll[0] * inv))])
+  #hand back the list of coordinates
+  return decoded
+
+valhalla_route_dict = {
+  "locations": [
+    {
+      "lat": 40.532633,
+      "lon": -74.331379
+    },
+    {
+      "lat": 40.564025,
+      "lon": -74.264660
+    }
+  ],
+  "costing": "auto",
+  "costing_options": {
+    "auto": {
+      "use_highways": 0,
+      "use_tolls": 0,
+      "top_speed": 45 * 1.609, # convert from mph to kph
+    }
+  },
+  "units": "miles",
+  "id": "my_work_route"
+}
+url = "https://valhalla1.openstreetmap.de/route?json={}".format(json.dumps(valhalla_route_dict))
+r = requests.get(url)
+res = r.json()
+route_latlngs = decode(res['trip']['legs'][0]['shape'])
+route_distance = res['trip']['summary']['length']
+route_duration = res['trip']['summary']['time']
+print(route_latlngs)
+print(route_distance)
+print(route_duration)
+
+
+from floyd_warshall import initialise, constructPath, floydWarshall, printPath
+
+# Driver code
+MAXM,INF = 100,10**7
+dis = [[-1 for i in range(MAXM)] for i in range(MAXM)]
+Next = [[-1 for i in range(MAXM)] for i in range(MAXM)]
+
+V = 4
+graph = [ [ 0, 3, INF, 7 ],
+		[ 8, 0, INF, INF ],
+		[ 5, INF, 0, 1 ],
+		[ 2, INF, INF, 0 ] ]
+
+# Function to initialise the
+# distance and Next array
+initialise(V, dis, Next, graph, INF)
+
+# Calling Floyd Warshall Algorithm,
+# this will update the shortest
+# distance as well as Next array
+floydWarshall(V, Next, dis, INF)
+path = []
+
+# Path from node 1 to 3
+print("Shortest path from 1 to 3: ", end = "")
+path = constructPath(1, 3, graph, Next)
+printPath(path)
+
+# Path from node 0 to 2
+print("Shortest path from 0 to 2: ", end = "")
+path = constructPath(0, 2, graph, Next)
+printPath(path)
+
+# Path from node 3 to 2
+print("Shortest path from 3 to 2: ", end = "")
+path = constructPath(3, 2, graph, Next)
+printPath(path)
+
+# Path from node 0 to 2
+print("Shortest path from 2 to 0: ", end = "")
+path = constructPath(2, 0, graph, Next)
+printPath(path)
+
+# Path from node 0 to 2
+print("Shortest path from 0 to 0: ", end = "")
+path = constructPath(0, 0, graph, Next)
+printPath(path)
+
+# This code is contributed by mohit kumar 29

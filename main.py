@@ -16,6 +16,7 @@ import h3
 from random import sample
 import polyline
 import numpy as np
+from ratelimiter import RateLimiter
 
 from Dispatcher import Dispatcher
 
@@ -29,6 +30,8 @@ global person_trip_lst_latlngs_by_h3_index
 global lst_h3_indices
 global h3_resolution
 h3_resolution = 8
+
+from floyd_warshall import initialise, constructPath, floydWarshall, printPath
 
 app = Flask("__main__", template_folder=os.path.join(THIS_FOLDER, "templates"))
 
@@ -111,7 +114,7 @@ def filter_person_trip_files(list_of_unzipped_files):
                 gcdistance = float(row[gcdistance_idx])
                 origin_h3_index = h3.geo_to_h3(lat, lng, h3_resolution)
                 dest_h3_index = h3.geo_to_h3(dest_lat, dest_lng, h3_resolution)
-                if origin_h3_index in lst_h3_indices and dest_h3_index in lst_h3_indices and gcdistance > .5:
+                if origin_h3_index in lst_h3_indices and dest_h3_index in lst_h3_indices and gcdistance > .707:
                     person_trip_lst_latlngs.append([lat, lng])
                     person_trip_lst_latlngs.append([dest_lat, dest_lng])
                     person_trips_in_kiosk_network.append(row)
@@ -125,21 +128,99 @@ def filter_person_trip_files(list_of_unzipped_files):
                         person_trip_lst_latlngs_by_h3_index[dest_h3_index].append([dest_lat, dest_lng])
 
 
-def getRouteMeta(latlng1, latlng2):
-    loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
-    url = "http://127.0.0.1:5000/route/v1/driving/"
-    r = requests.get(url + loc + "?overview=full&annotations=true")
+#decode an encoded string
+def decode(encoded):
+  #six degrees of precision in valhalla
+  inv = 1.0 / 1e6;
+
+  decoded = []
+  previous = [0,0]
+  i = 0
+  #for each byte
+  while i < len(encoded):
+    #for each coord (lat, lon)
+    ll = [0,0]
+    for j in [0, 1]:
+      shift = 0
+      byte = 0x20
+      #keep decoding bytes until you have this coord
+      while byte >= 0x20:
+        byte = ord(encoded[i]) - 63
+        i += 1
+        ll[j] |= (byte & 0x1f) << shift
+        shift += 5
+      #get the final value adding the previous offset and remember it for the next
+      ll[j] = previous[j] + (~(ll[j] >> 1) if ll[j] & 1 else (ll[j] >> 1))
+      previous[j] = ll[j]
+    #scale by the precision and chop off long coords, keep positions as lat, lon
+    decoded.append([float('%.6f' % (ll[0] * inv)), float('%.6f' % (ll[1] * inv))])
+  #hand back the list of coordinates
+  return decoded
+
+
+def getTimestamps(lst_route_leg_maneuvers, route_duration, len_route_latlngs):
+    raw_timestamps = []
+    for maneuver in lst_route_leg_maneuvers:
+        number_of_timestamp_slots = maneuver['end_shape_index'] - maneuver['begin_shape_index']
+        maneuver_time = maneuver['time']
+        split_times = []
+        for i in range(number_of_timestamp_slots):
+            split_times.append(maneuver_time/number_of_timestamp_slots)
+        raw_timestamps.extend(split_times)
+    # timestamps = list(np.cumsum(raw_timestamps))
+    raw_timestamps.insert(0, 0)
+    assert len(raw_timestamps) == len_route_latlngs, "The number of timestamps should be equal to number of latlngs coordinates in polyline"
+    return raw_timestamps
+
+
+def getRouteMeta(latlng1, latlng2, avoidLocations):
+    # loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
+    # url = "http://127.0.0.1:5000/route/v1/driving/"
+    # r = requests.get(url + loc + "?overview=full&annotations=true&exclude=motorway")
+    # raw_timestamps = res['routes'][0]['legs'][0]['annotation']['duration']
+    # raw_timestamps.insert(0, 0) # raw_timestamps gives list of times you should add to previous sum
+    # route_timestamps = list(np.cumsum(raw_timestamps))
+    #
+    # route_latlngs = polyline.decode(res['routes'][0]['geometry'])
+    # route_distance = res['routes'][0]['distance']
+    # route_duration = res['routes'][0]['duration']
+
+    valhalla_route_dict = {
+      "locations": [
+        {
+          "lat": latlng1[0],
+          "lon": latlng1[1]
+        },
+        {
+          "lat": latlng2[0],
+          "lon": latlng2[1]
+        }
+      ],
+      "costing": "auto",
+      "costing_options": {
+        "auto": {
+          "use_highways": 0,
+          "use_tolls": 0,
+          "top_speed": 45 * 1.609, # convert from mph to kph
+        }
+      },
+      "exclude_locations": avoidLocations,
+      "units": "miles",
+      "id": "my_work_route"
+    }
+    url = "https://valhalla1.openstreetmap.de/route?json={}".format(json.dumps(valhalla_route_dict))
+    print("URL", url)
+    r = requests.get(url)
     if r.status_code != 200:
-        print("ERROR")
+        print("VALHALLA RETURNED ERROR", r.status_code)
+        print(r.json()['error'])
         return {}
     res = r.json()
-    raw_timestamps = res['routes'][0]['legs'][0]['annotation']['duration']
-    raw_timestamps.insert(0, 0) # raw_timestamps gives list of times you should add to previous sum
-    route_timestamps = list(np.cumsum(raw_timestamps))
+    route_latlngs = decode(res['trip']['legs'][0]['shape'])
+    route_distance = res['trip']['summary']['length']
+    route_duration = res['trip']['summary']['time']
+    route_timestamps = getTimestamps(res['trip']['legs'][0]['maneuvers'], route_duration, len(route_latlngs))
 
-    route_latlngs = polyline.decode(res['routes'][0]['geometry'])
-    route_distance = res['routes'][0]['distance']
-    route_duration = res['routes'][0]['duration']
     return route_latlngs, route_distance, route_duration, route_timestamps
 
 def getNearestStreetCoordinate(latlng1):
@@ -152,22 +233,29 @@ def getNearestStreetCoordinate(latlng1):
     print(res)
     return "SUCCESS"
 
-@app.route("/get_routes")
-def get_routes():
-    route_metas = {}
-    lst_latlngs = request.args.get('lst_latlngs').split(',')
-    lst_latlngs = [[float(lat), float(lon)] for lat, lon in [lst_latlngs[x:x+2] for x in range(0, len(lst_latlngs), 2)]]
-    new_marker_lat, new_marker_lng = request.args.get('new_marker').split(',')
-    new_marker_lat_lng = [float(new_marker_lat), float(new_marker_lng)]
-    for lat_lng in lst_latlngs:
-        if not lat_lng == new_marker_lat_lng:
-            str_new_marker_lat_lng = ','.join(str(x) for x in new_marker_lat_lng)
-            str_lat_lng = ','.join(str(x) for x in lat_lng)
-            route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(new_marker_lat_lng, lat_lng)
-            route_metas['{};{}'.format(str_new_marker_lat_lng, str_lat_lng)] = {'latlngs': route_latlngs, 'distance': route_distance, 'duration': route_duration, 'timestamps': route_timestamps}
-            route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(lat_lng, new_marker_lat_lng)
-            route_metas['{};{}'.format(str_lat_lng, str_new_marker_lat_lng)] = {'latlngs': route_latlngs, 'distance': route_distance, 'duration': route_duration, 'timestamps': route_timestamps}
-    return route_metas
+@app.route("/get_route", methods=['POST'])
+def get_route():
+    received_data = request.get_json()
+    latlng1 = received_data['latlng1']
+    latlng2 = received_data['latlng2']
+    avoidLocations = received_data['avoidLocations']
+    print(avoidLocations)
+
+    rate_limiter = RateLimiter(max_calls=1, period=1)
+    with rate_limiter:
+        str_latlng1 = ','.join(str(x) for x in latlng1)
+        str_latlng2 = ','.join(str(x) for x in latlng2)
+        key = '{};{}'.format(str_latlng1, str_latlng2)
+        route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(latlng1, latlng2, avoidLocations)
+    response = {
+        'key': key,
+        'latlngs': route_latlngs,
+        'distance': route_distance,
+        'duration': route_duration,
+        'timestamps': route_timestamps
+    }
+    print(response)
+    return response
 
 @app.route("/extract_person_trip_files")
 def extract_person_trip_files():
@@ -242,70 +330,169 @@ def draw_precalculated_kiosks():
         lst_marker_latlngs.append([average_lat, average_lng])
     return { "lst_marker_latlngs": lst_marker_latlngs }
 
+@app.route("/save_ODD", methods=['POST'])
+def save_ODD():
+    received_data = request.get_json()
+
+    city_name = received_data['city_name']
+    city_name = "PERTH_AMBOY_TESTING"
+    avoidLocationsGeoJSON = received_data['avoidLocationsGeoJSON']
+    markersGeoJSON = received_data['markersGeoJSON']
+    circlesGeoJSON = received_data['circlesGeoJSON']
+    polylinesGeoJSON = received_data['polylinesGeoJSON']
+
+    with open("static/" + city_name + "/avoidLocationsGeoJSON.geojson", "w") as f:
+        json.dump(avoidLocationsGeoJSON, f)
+    with open("static/" + city_name + "/markersGeoJSON.geojson", "w") as f:
+        json.dump(markersGeoJSON, f)
+    with open("static/" + city_name + "/circlesGeoJSON.geojson", "w") as f:
+        json.dump(circlesGeoJSON, f)
+    with open("static/" + city_name + "/polylinesGeoJSON.geojson", "w") as f:
+        json.dump(polylinesGeoJSON, f)
+
+    response = {
+        "message": "Your ODD saved successfully."
+    }
+    return response
+
+def getRouteDictFromPath(path, lst_latlngs, str_lst_latlngs, routes_dict):
+    result = {}
+    assert len(path) > 0, "There must be a path to every node from every other node"
+    if len(path) == 1:
+        idx = path[0]
+        result = {'latlngs': [lst_latlngs[idx], lst_latlngs[idx]], 'distance': 0, 'duration': 0, 'timestamps': [0]}
+    else:
+        total_latlngs = []
+        total_distance = 0
+        total_duration = 0
+        total_raw_timestamps = []
+        list_of_tuples = list(zip(path, path[1:]))
+        for first_idx, second_idx in list_of_tuples:
+            key = '{};{}'.format(str_lst_latlngs[first_idx], str_lst_latlngs[second_idx])
+            leg_data = routes_dict[key]
+            total_latlngs.extend(leg_data['latlngs'])
+            total_distance += leg_data['distance']
+            total_duration += leg_data['duration']
+            total_raw_timestamps.extend(leg_data['timestamps'])
+        total_timestamps = list(np.cumsum(total_raw_timestamps))
+        total_timestamps[-1] = total_duration
+        result = {'latlngs': total_latlngs, 'distance': total_distance, 'duration': total_duration, 'timestamps': total_timestamps}
+    return result
+
+
+def getCompleteRoutesMatrix(lst_latlngs, routes_dict):
+    return_complete_route_matrix = {}
+    str_lst_latlngs = [",".join([str(lat), str(lng)]) for lat, lng in lst_latlngs]
+
+    print(str_lst_latlngs)
+    print(routes_dict)
+
+    V = len(lst_latlngs)
+    INF = 10**7
+    graph = np.empty([V, V])
+    for i in range(V):
+        for j in range(V):
+            if i == j:
+                graph[i][j] = 0
+            else:
+                key1 = '{};{}'.format(str_lst_latlngs[i], str_lst_latlngs[j])
+                key2 = '{};{}'.format(str_lst_latlngs[j], str_lst_latlngs[i])
+                if key1 in routes_dict:
+                    graph[i][j] = routes_dict[key1]['duration']
+                    graph[j][i] = routes_dict[key1]['duration']
+                    if not key2 in routes_dict:
+                        routes_dict[key2] = routes_dict[key1]
+                elif key2 in routes_dict:
+                    graph[i][j] = routes_dict[key2]['duration']
+                    graph[j][i] = routes_dict[key2]['duration']
+                    if not key1 in routes_dict:
+                        routes_dict[key1] = routes_dict[key2]
+                else:
+                    graph[i][j] = INF
+    print("GRAPH")
+    print(graph)
+
+    MAXM = 100
+    dis = [[-1 for i in range(MAXM)] for i in range(MAXM)]
+    Next = [[-1 for i in range(MAXM)] for i in range(MAXM)]
+
+    initialise(V, dis, Next, graph, INF)
+    floydWarshall(V, Next, dis, INF)
+    path = []
+
+    for i in range(V):
+        for j in range(V):
+            print("Shortest path from {} to {}: ".format(str_lst_latlngs[i], str_lst_latlngs[j]), end = "")
+            path = constructPath(i, j, graph, Next)
+            printPath(path)
+            return_complete_route_matrix['{};{}'.format(str_lst_latlngs[i], str_lst_latlngs[j])] = getRouteDictFromPath(path, lst_latlngs, str_lst_latlngs, routes_dict)
+    return return_complete_route_matrix
+
 
 @app.route("/create_simulation", methods=['POST'])
 def prepare_simulation():
-        received_data = request.get_json()
+    received_data = request.get_json()
 
-        CITY_NAME = received_data['city_name']
-        CITY_NAME = "TRENTON_TESTING"
-        county_name = received_data['county_name']
-        state_name = received_data['state_name']
-        center_lng_lat = received_data['center_lng_lat']
-        lst_latlngs = received_data['lst_marker_latlngs']
-        depot_matrix = received_data['routes_dict']
-        lst_fleetsize = [int(elem) for elem in received_data['lst_fleetsize']]
-        modesplit = float(received_data['modesplit'])
-        print(CITY_NAME, county_name, state_name, center_lng_lat, lst_latlngs)
+    CITY_NAME = received_data['city_name']
+    CITY_NAME = "PERTH_AMBOY_TESTING"
+    county_name = received_data['county_name']
+    state_name = received_data['state_name']
+    center_lng_lat = received_data['center_lng_lat']
+    lst_latlngs = received_data['lst_marker_latlngs']
+    routes_dict = received_data['routes_dict']
+    lst_fleetsize = [int(elem) for elem in received_data['lst_fleetsize']]
+    modesplit = float(received_data['modesplit'])
 
-        # IS THIS NECESSARY? We get errors trying to render empty routes in the setup page
-        for latlng in lst_latlngs:
-            str_lat_lng = ','.join(str(x) for x in latlng)
-            depot_matrix['{};{}'.format(str_lat_lng, str_lat_lng)] = {'latlngs': [latlng, latlng], 'distance': 0, 'duration': 0, 'timestamps': [0]}
+    # depot_matrix = getCompleteRoutesMatrix(lst_latlngs, routes_dict)
+    # print(depot_matrix)
+    with open("static/" + city_name + "/depotmatrix.json", "w") as f:
+        depot_matrix = json.load(f)
 
-        # Make the CITY_NAME folder to store files inside
-        shutil.rmtree(os.path.join(THIS_FOLDER, "static", CITY_NAME), ignore_errors=True)
-        os.mkdir(os.path.join(THIS_FOLDER, "static", CITY_NAME))
+    print(CITY_NAME, county_name, state_name, center_lng_lat, lst_latlngs)
 
-        depot_data_filename = CITY_NAME+state_name+"_AV_Station.csv"
-        COL_FIELDS = ["Name", "Lat", "Long"]
-        with open(os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename), 'w', newline='') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(COL_FIELDS)
-            csvwriter.writerows([[idx, latlng[0], latlng[1]] for idx, latlng in enumerate(lst_latlngs)]) # Switch this to kiosks with names
+    # Make the CITY_NAME folder to store files inside
+    shutil.rmtree(os.path.join(THIS_FOLDER, "static", CITY_NAME), ignore_errors=True)
+    os.mkdir(os.path.join(THIS_FOLDER, "static", CITY_NAME))
 
-        # Create Depot Building Objects for Visualization
-        offset = 0.0002
-        height = 50
-        buildings = []
-        for depot in lst_latlngs:
-            polygon = [[depot[0]-offset, depot[0]+offset],
-                       [depot[0]+offset, depot[0]+offset],
-                       [depot[0]+offset, depot[0]-offset],
-                       [depot[0]-offset, depot[0]-offset]]
-            polygon = [[elem[1], elem[0]] for elem in polygon]
-            buildings.append({"height": height, "polygon": polygon, "m": "Depot"})
+    depot_data_filename = CITY_NAME+state_name+"_AV_Station.csv"
+    COL_FIELDS = ["Name", "Lat", "Long"]
+    with open(os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename), 'w', newline='') as csvfile:
+        csvwriter = csv.writer(csvfile)
+        csvwriter.writerow(COL_FIELDS)
+        csvwriter.writerows([[idx, latlng[0], latlng[1]] for idx, latlng in enumerate(lst_latlngs)]) # Switch this to kiosks with names
 
-        with open("static/" + CITY_NAME + "/depotbuildings.json", "w") as f:
-            json.dump(buildings, f)
+    # Create Depot Building Objects for Visualization
+    offset = 0.0002
+    height = 50
+    buildings = []
+    for depot in lst_latlngs:
+        polygon = [[depot[0]-offset, depot[0]+offset],
+                   [depot[0]+offset, depot[0]+offset],
+                   [depot[0]+offset, depot[0]-offset],
+                   [depot[0]-offset, depot[0]-offset]]
+        polygon = [[elem[1], elem[0]] for elem in polygon]
+        buildings.append({"height": height, "polygon": polygon, "m": "Depot"})
 
-        global person_trips_in_kiosk_network
-        global person_trips_csv_header
+    with open("static/" + CITY_NAME + "/depotbuildings.json", "w") as f:
+        json.dump(buildings, f)
 
-        create_animation_dict = {
-            'CITY_NAME': CITY_NAME,
-            'depot_data_filename': depot_data_filename,
-            'depot_matrix': depot_matrix,
-            'person_trips_in_kiosk_network': person_trips_in_kiosk_network,
-            'person_trips_csv_header': person_trips_csv_header,
-            'modesplit': modesplit,
-            'lst_fleetsize': lst_fleetsize,
-            'center_lng_lat': center_lng_lat
-        }
+    global person_trips_in_kiosk_network
+    global person_trips_csv_header
 
-        saveCreateAnimationDict(create_animation_dict)
-        response = create_animation(CITY_NAME)
-        return response
+    create_animation_dict = {
+        'CITY_NAME': CITY_NAME,
+        'depot_data_filename': depot_data_filename,
+        'depot_matrix': depot_matrix,
+        'person_trips_in_kiosk_network': person_trips_in_kiosk_network,
+        'person_trips_csv_header': person_trips_csv_header,
+        'modesplit': modesplit,
+        'lst_fleetsize': lst_fleetsize,
+        'center_lng_lat': center_lng_lat
+    }
+
+    saveCreateAnimationDict(create_animation_dict)
+    response = create_animation(CITY_NAME)
+    return response
 
 def saveCreateAnimationDict(create_animation_dict):
     city_name = create_animation_dict['CITY_NAME']
@@ -317,13 +504,24 @@ def create_animation(CITY_NAME):
         create_animation_dict = json.load(f)
 
     CITY_NAME = create_animation_dict['CITY_NAME']
-    depot_data_filename = create_animation_dict['depot_data_filename']
-    depot_matrix = create_animation_dict['depot_matrix']
-    person_trips_in_kiosk_network = create_animation_dict['person_trips_in_kiosk_network']
+    #depot_data_filename = create_animation_dict['depot_data_filename']
+    #depot_matrix = create_animation_dict['depot_matrix']
+    #person_trips_in_kiosk_network = create_animation_dict['person_trips_in_kiosk_network']
     person_trips_csv_header = create_animation_dict['person_trips_csv_header']
-    modesplit = create_animation_dict['modesplit']
-    lst_fleetsize = create_animation_dict['lst_fleetsize']
+    #modesplit = create_animation_dict['modesplit']
+    #lst_fleetsize = create_animation_dict['lst_fleetsize']
     center_lng_lat = create_animation_dict['center_lng_lat']
+
+    depot_data_filename = "PERTH_AMBOY_TESTING_AV_Stations.csv"
+    with open("static/" + CITY_NAME + "/depotmatrix.json", "r") as f:
+        depot_matrix = json.load(f)
+
+    with open("static/" + CITY_NAME + "/person_trips_in_xypixel_ODD.json") as f:
+        person_trips_in_xypixel_ODD = json.load(f)['person_trips_in_xypixel_ODD']
+
+
+    lst_fleetsize = [50]
+    modesplit = 25.0
 
     start_time = time.time()
 
@@ -334,7 +532,7 @@ def create_animation(CITY_NAME):
 
     aDispatcher = Dispatcher(CITY_NAME, angry_passenger_threshold_sec, depot_matrix)
     depot_csv_name = os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename)
-    aDispatcher.createDataFeed(depot_csv_name, person_trips_in_kiosk_network, person_trips_csv_header, modesplit)
+    aDispatcher.createDataFeed(depot_csv_name, person_trips_in_xypixel_ODD, person_trips_csv_header, modesplit)
 
 
     for idx, fleetsize in enumerate(lst_fleetsize):
@@ -404,47 +602,10 @@ def create_animation(CITY_NAME):
 
 @app.route("/animation")
 def my_index():
-    global THIS_FOLDER
-    CITY_NAME = request.args.get('city_choice')
-    animation_speed = request.args.get('animation_speed', default = 1, type = int)
-    start_time = request.args.get('start_time', default = 0, type = int)
+    with open("local_static/trips.json", "r") as f:
+        trips = json.load(f)
 
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depotbuildings.json")
-    with open(my_file, "r") as f:
-        buildings = json.load(f)
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "trips.json.gz")
-    trips = compress_json.load(my_file)
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depot_locations.txt")
-    with open(my_file, "r") as f:
-        depot_locations = f.read()
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "missed_passengers.json.gz")
-    missed_passengers = compress_json.load(my_file)
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "waiting.json.gz")
-    waiting = compress_json.load(my_file)
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metric_animations.json.gz")
-    metric_animations = compress_json.load(my_file)
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "looplength.txt")
-    with open(my_file, "r") as f:
-        loop_length = int(f.read())
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "index_metrics.txt")
-    with open(my_file, "r") as f:
-        index_metrics = f.read()
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json.gz")
-    metrics = compress_json.load(my_file)
-
-    my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "viewstate_coordinates.txt")
-    with open(my_file, "r") as f:
-        viewstate_coordinates = f.read()
-
-    html = render_template("index.html", buildings=buildings, trips = trips, depot_locations = depot_locations, missed_passengers = missed_passengers, waiting = waiting, metric_animations = metric_animations, loop_length = loop_length, animation_speed=animation_speed, start_time=start_time, metrics = metrics, index_metrics = index_metrics, viewstate_coordinates=viewstate_coordinates)
+    html = render_template("index.html", trips=trips)
     response = make_response(html)
     return response
 
@@ -469,10 +630,10 @@ def main(argv):
     print(args)
 
     if args.testing:
-        CITY_NAME = "TRENTON_TESTING"
+        CITY_NAME = "PERTH_AMBOY_TESTING"
         create_animation(CITY_NAME)
 
-    app.run(host="localhost", port=8000, debug=True)
+    app.run(host="localhost", port=8000, debug=False)
     # Go on http://localhost:8000/animation?city_choice=TRENTON_TESTING
 
 #Comment out before updating PythonAnywhere

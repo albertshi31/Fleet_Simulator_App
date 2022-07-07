@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Animation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      body {margin: 0; font-family: sans-serif; width: 100vw; height: 100vh; overflow: hidden;}
+    </style>
+    <script src="https://kit.fontawesome.com/cd50251ae1.js" crossorigin="anonymous"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script src="https://cdn.plot.ly/plotly-2.4.2.min.js"></script>
+
+    <script type="text/javascript">
+      const BUILDINGS = {{buildings|tojson}};
+      const TRIPS = {{trips|tojson}};
+      const DEPOT_LOCATIONS = {{depot_locations}};
+      const MISSED_PASSENGERS = {{missed_passengers|tojson}};
+      const WAITING = {{waiting|tojson}};
+      const METRIC_ANIMATIONS = {{metric_animations|tojson}};
+      const LOOP_LENGTH = {{loop_length}};
+      const ANIMATION_SPEED = {{animation_speed}}; // provide animation_speed as a state change to React App component
+      const START_TIME = {{start_time}};
+      const INDEX_METRICS = {{index_metrics}};
+      const VIEWSTATE_COORDINATES = {{viewstate_coordinates}};
+    </script>
+
+    <style type='text/css'>
+      table, td, th {
+        border: 1px solid black;
+      }
+
+      table {
+        border-collapse: collapse;
+      }
+
+      td {
+        text-align: center;
+      }
+
+      /* https://tilemill-project.github.io/tilemill/docs/guides/advanced-legends/ */
+      .my-legend .legend-title {
+        text-align: left;
+        margin-bottom: 5px;
+        font-weight: bold;
+        font-size: 120%;
+        }
+      .my-legend .legend-scale ul {
+        margin: 0;
+        margin-bottom: 5px;
+        padding: 0;
+        float: left;
+        list-style: none;
+        }
+      .my-legend .legend-scale ul li {
+        font-size: 80%;
+        list-style: none;
+        margin-left: 0;
+        line-height: 18px;
+        margin-bottom: 2px;
+        }
+      .my-legend ul.legend-labels li span {
+        display: inline-block;
+        height: 10px;
+        width: 25px;
+        margin-right: 5px;
+        margin-left: 5px;
+        border: 1px solid #999;
+        }
+      .my-legend .legend-source {
+        font-size: 70%;
+        color: #999;
+        clear: both;
+        }
+      .my-legend a {
+        color: #777;
+        }
+
+      .list-group-item {
+        font-size: 12px;
+        padding: 0.25rem 1rem;
+      }
+
+      .card-header {
+        font-size: 15px;
+        padding: 0.5rem 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div style="z-index: 1;">
+      <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="#">TransitAV</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="/choose_city">Choose City</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/animation">Animation</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/graphs">Graphs</a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+    <div class="card" style="width: 20%;">
+      <div class="card-header">
+        Stats for Entire Run
+      </div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item">Total Vehicles Used: <span id="total_vehicles_used"></span></li>
+        <li class="list-group-item">Total Passengers: <span id="total_passengers"></span></li>
+        <li class="list-group-item">Total Passengers Served: <span id="total_passengers_served"></span></li>
+        <li class="list-group-item">Total Passengers Missed: <span id="total_passengers_missed"></span></li>
+        <li class="list-group-item">Total Vehicle Miles Traveled: <span id="total_vehicle_miles_traveled"></span> mi</li>
+        <li class="list-group-item">Empty Vehicle Miles Traveled: <span id="empty_vehicle_miles_traveled"></span> mi</li>
+        <li class="list-group-item">Avg Pax Wait Time: <span id="avg_passenger_wait_time"></span> sec</li>
+        <li class="list-group-item">P90 Pax Wait Time: <span id="p90_passenger_wait_time"></span> sec</li>
+        <li class="list-group-item">P99 Pax Wait Time: <span id="p99_passenger_wait_time"></span> sec</li>
+      </ul>
+    </div>
+
+    <div style="position: absolute; bottom: 0; width: 20%;">
+      <div class="card">
+        <div class="card-header">
+          Current Timeframe Stats
+        </div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">Cumulative Passengers Served: <span id="ServedPassengers"></span></li>
+          <li class="list-group-item">Current AVO: <span id="AVO"></span></li>
+          <li class="list-group-item">Num of Cars En Route: <span id="NumOfActiveVehicles"></span></li>
+          <li class="list-group-item">Num of Pax En Route: <span id="NumOfActivePassengers"></span></li>
+          <li class="list-group-item">Cumulative Sum of Angry Pax: <span id="PassengersLeft"></span></li>
+        </ul>
+      </div>
+      <h1 id="time" style="height:10vh; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white;"></h1>
+    </div>
+
+    <div id="clockdiv" style="position: absolute; bottom: 0; width: 25%;">
+    </div>
+
+    <script>
+      $("#total_passengers").html(INDEX_METRICS[0].toString());
+      $("#total_passengers_served").html((INDEX_METRICS[0] - INDEX_METRICS[1]).toString());
+      $("#total_passengers_missed").html(INDEX_METRICS[1].toString());
+      $("#total_vehicle_miles_traveled").html(INDEX_METRICS[2].toFixed(2).toString());
+      $("#empty_vehicle_miles_traveled").html(INDEX_METRICS[3].toFixed(2).toString());
+      $("#avg_passenger_wait_time").html(INDEX_METRICS[4].toFixed(2).toString());
+      $("#p90_passenger_wait_time").html(INDEX_METRICS[5].toFixed(2).toString());
+      $("#p99_passenger_wait_time").html(INDEX_METRICS[6].toFixed(2).toString());
+      $("#total_vehicles_used").html(INDEX_METRICS[7].toString());
+
+      $(document).ready(function() {
+        $("#zeroPax").prop('checked', true);
+        $("#onePax").prop('checked', true);
+        $("#twoPax").prop('checked', true);
+        $("#threePax").prop('checked', true);
+        $("#fourPax").prop('checked', true);
+        alert("You can zoom in and out on this map.\r\nHold SHIFT to rotate.\r\nAt each kiosk, blue text represents waiting vehicles and red text represents waiting passengers.\r\nVehicles are programmed to leave as soon as passenger arrives (red text won't update if passenger arrives then leaves immediately).");
+      });
+
+
+    </script>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+  </body>
+</html>

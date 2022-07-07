@@ -4,21 +4,7 @@ import {render} from 'react-dom';
 import {StaticMap} from 'react-map-gl';
 import {AmbientLight, PointLight, LightingEffect} from '@deck.gl/core';
 import DeckGL from '@deck.gl/react';
-import {PolygonLayer, TextLayer, ScatterplotLayer} from '@deck.gl/layers';
 import {TripsLayer} from '@deck.gl/geo-layers';
-
-function updateMetricAnimations(time) {
-  let num_active_vehicles = METRIC_ANIMATIONS["NumOfActiveVehicles"][time];
-  let num_active_passengers = METRIC_ANIMATIONS["NumOfActivePassengers"][time];
-  let avo = METRIC_ANIMATIONS["AVO"][time];
-  let passengers_left = METRIC_ANIMATIONS["PassengersLeft"][time];
-  let served_passengers = METRIC_ANIMATIONS["ServedPassengers"][time];
-  $('#AVO').html(avo.toFixed(2).toString());
-  $('#NumOfActiveVehicles').html(num_active_vehicles.toString());
-  $('#NumOfActivePassengers').html(num_active_passengers.toString());
-  $('#PassengersLeft').html(passengers_left.toString());
-  $('#ServedPassengers').html(served_passengers.toString());
-};
 
 function updateTime(time) {
   var period = "AM";
@@ -70,7 +56,7 @@ const material = {
 const DEFAULT_THEME = {
   buildingColor: [175, 175, 175], // gray
   trailColor0: [255, 0, 0], // red
-  trailColor1: [173, 216, 230], // lightblue
+  trailColor1: [252, 186, 3], // orange/gold
   trailColor2: [0, 0, 139], // dark blue
   trailColor3: [144, 238, 144], // light green
   trailColor4: [0, 100, 0], // dark green
@@ -79,28 +65,24 @@ const DEFAULT_THEME = {
 };
 
 const INITIAL_VIEW_STATE = {
-  longitude: VIEWSTATE_COORDINATES[1],
-  latitude: VIEWSTATE_COORDINATES[0],
+  longitude: -74.753789,
+  latitude: 40.227492,
   zoom: 12,
   pitch: 45,
   bearing: 0
 };
 
-const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/positron-nolabels-gl-style/style.json';
+const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
 function App({
-  buildings = BUILDINGS,
-  depot_locations = DEPOT_LOCATIONS,
   trips = TRIPS,
-  missed_passengers = MISSED_PASSENGERS,
-  waiting = WAITING,
   trailLength = 15,
   initialViewState = INITIAL_VIEW_STATE,
   mapStyle = MAP_STYLE,
   theme = DEFAULT_THEME,
-  loopLength = LOOP_LENGTH, // unit corresponds to the timestamp in source data
-  startingAnimationSpeed = ANIMATION_SPEED,
-  startTime = START_TIME
+  loopLength = 86995, // unit corresponds to the timestamp in source data
+  startingAnimationSpeed = 1,
+  startTime = 0
 }) {
   // States that decide which vehicle occupancy to show
   const [occupancyHideArray, setOccupancyHideArray] = useState([]);
@@ -109,7 +91,6 @@ function App({
   const [prevAnimationSpeed, setPrevAnimationSpeed] = useState(animationSpeed);
   const [time, setTime] = useState(startTime);
   updateTime(time);
-  updateMetricAnimations(time);
   const [animation] = useState({});
 
   const animate = () => {
@@ -125,16 +106,15 @@ function App({
     [animation, animationSpeed, time, prevAnimationSpeed, occupancyHideArray]
   );
 
-  const depotLocations = depot_locations;
   const trailColors = [theme.trailColor0, theme.trailColor1, theme.trailColor2, theme.trailColor3, theme.trailColor4];
   const layers = [
     new TripsLayer({
       id: 'trips',
       data: trips,
-      getPath: d => d.path,
+      getPath: d => d.lnglats,
       getTimestamps: d => d.timestamps,
       getColor: d => {
-        let num = d.vendor;
+        let num = d.num_passengers;
         if (!(occupancyHideArray.includes(num))) {
           return trailColors[num];
         }
@@ -154,56 +134,6 @@ function App({
       // Enable picking
       pickable: true
     }),
-    new PolygonLayer({
-      id: 'buildings',
-      data: buildings,
-      extruded: true,
-      wireframe: false,
-      opacity: 0.5,
-      getPolygon: f => f.polygon,
-      getElevation: f => f.height,
-      getFillColor: theme.buildingColor,
-      material: theme.material,
-      // Enable picking
-      pickable: true
-    }),
-    new TextLayer({
-      id: 'waiting_passengers',
-      data: waiting[time],
-      getPosition: d => depotLocations[d.c.split(" ")[0]],
-      getText: d => d.c.split(" ")[1],
-      getSize: 20,
-      getColor: [255, 0, 0],
-      getTextAnchor: 'start',
-      getAlignmentBaseline: 'bottom',
-      getPixelOffset: [5, 5],
-      parameters: {depthTest: false}
-    }),
-    new TextLayer({
-      id: 'waiting_vehicles',
-      data: waiting[time],
-      getPosition: d => depotLocations[d.c.split(" ")[0]],
-      getText: d => d.c.split(" ")[2],
-      getSize: 20,
-      getColor: [79, 130, 247],
-      getTextAnchor: 'end',
-      getAlignmentBaseline: 'bottom',
-      getPixelOffset: [-5, 5],
-      parameters: {depthTest: false}
-    }),
-    new ScatterplotLayer({
-      id: 'missed_passengers',
-      data: missed_passengers[time],
-      getPosition: d => depotLocations[d.c],
-      getRadius: 100,
-      filled: true,
-      getFillColor: [255, 0, 0],
-      opacity: 0.5,
-      radiusMinPixels: 1,
-      radiusMaxPixels: 200,
-      parameters: {depthTest: false},
-      pickable: true
-    })
   ];
 
   return (
@@ -246,7 +176,7 @@ function App({
               setOccupancyHideArray(result);
             }} />
                 <label for="onePax">
-                  <span style={{background: '#ADD8E6'}}></span>One Passenger
+                  <span style={{background: '#FCBA03'}}></span>One Passenger
                 </label>
             </li>
             <li>
@@ -337,7 +267,6 @@ function App({
       effects={theme.effects}
       initialViewState={initialViewState}
       controller={true}
-      getTooltip={({object}) => object && object.m}
     >
       <StaticMap reuseMaps mapStyle={mapStyle} preventStyleDiffing={true} />
     </DeckGL>

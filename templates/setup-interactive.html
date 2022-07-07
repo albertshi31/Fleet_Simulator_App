@@ -19,6 +19,12 @@
   <script
     src="https://api.jawg.io/libraries/jawg-places@latest/jawg-places.js?access-token={{jawg_accessToken}}"></script>
 
+  <!-- Todo: CHECK WHICH FILES WE DON'T NEED -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+  <link rel="stylesheet" href="http://code.ionicframework.com/ionicons/1.5.2/css/ionicons.min.css">
+
   <style>
     html,
     body {
@@ -105,9 +111,9 @@
     }
 
     .loading-icon {
-      z-index: 1000;
       padding-top: 5px;
     }
+
   </style>
 </head>
 
@@ -241,21 +247,32 @@
   </div>
   <div class="container" id="kiosks">
     <div class="box">
+      <div id="avoidLocationsDiv">
+        <input type="checkbox" name="avoidLocationsCheckbox" id="avoidLocationsCheckbox">
+        <label for="avoidLocationsCheckbox">Add Locations to Avoid</label>
+      </div>
       <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#showPromptNewKioskModal">Add Kiosk</button>
       <div class="my-custom-scrollbar" id="listkiosks">
         <div class="panel-heading">List of Kiosks:</div>
       </div>
       <div id="routenetwork">
         Number of road miles to map: <span id="num_road_miles"></span> <br>
-        Number of Trips Served by Kiosk Network: <span id="numTripsInKioskNetwork"></span> <br>
+        Number of Person Trips Served by Kiosk Network: <span id="numTripsInKioskNetwork"></span> <br>
         <!-- Least Dense<input id="routenetworkdensityslider" type="range" oninput="renderRoutes(this.value)">Most Dense -->
-        <div id="distancematrix"></div><br>
+        <!-- <div id="distancematrix"></div><br> -->
         <!-- <button type="button" class="btn btn-info" onclick="duration_table_view='minutes'; updateDurationTable()">In Seconds</button> <button type="button" class="btn btn-info" onclick="duration_table_view='miles'; updateDurationTable()">In Miles</button> -->
       </div>
+
+      <div id="connectKiosksDiv">
+        Marker 1: <span id="connectKiosksDiv_marker1"></span><br />
+        Marker 2: <span id="connectKiosksDiv_marker2"></span><br />
+        <button type="button" class="btn btn-info" onclick="getRoute()">Connect Kiosks</button>
+      </div>
+
       <div class="btn-group" role="group" aria-label="Button Group">
         <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#showSubmitModal">Simulate Trips</button>
+        <button type="button" class="btn btn-primary" onclick="saveODD()">Save ODD</button>
         <button type="button" class="btn btn-danger" onclick="resetAll()">Reset All</button>
-        <button type="button" class="btn btn-info" onclick="toggleLayer()">Layer</button>
       </div>
       <div class="loading-icon" id="loading_heatmap_icon">
         <button class="btn btn-primary" type="button" disabled>
@@ -295,6 +312,25 @@
     var bbox;
 
     var mymap = L.map('map').setView([44.967243, -103.771556], 3);
+
+    var redMarker = L.AwesomeMarkers.icon({
+      markerColor: 'red'
+    });
+
+    var avoidLocationsLayerGroup = L.layerGroup().addTo(mymap);
+    function addLocationsToAvoid(e) {
+      if ($('#avoidLocationsCheckbox').prop('checked')) {
+        var marker = L.marker(e.latlng, {
+          icon: redMarker
+        }).addTo(avoidLocationsLayerGroup);
+        console.log("Added avoid locations marker");
+
+        marker.on('click', function(e){
+          avoidLocationsLayerGroup.removeLayer(marker);
+        });
+      }
+    }
+
     mymap.addLayer(new L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
       attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
       id: 'mapbox/streets-v11',
@@ -344,6 +380,7 @@
 
     var markers = {};
     var circles = {};
+    var polylines = {};
     var kiosks = {};
 
     function moveToKiosk(marker_id) {
@@ -368,47 +405,50 @@
       lat = parseFloat($('#editKioskForm_lat').val());
       lng = parseFloat($('#editKioskForm_lng').val());
       kiosks[editKiosk_marker_id] = {'name': name, 'category': category, 'lat': lat, 'lng': lng};
-      $('#name_'+editKiosk_marker_id).text(name);
-      $('#category_'+editKiosk_marker_id).text(category);
-      $('#loc_'+editKiosk_marker_id).text(lat.toFixed(5) + ";" + lng.toFixed(5));
+      $('#panel_name_'+editKiosk_marker_id).text(name);
+      $('#panel_category_'+editKiosk_marker_id).text(category);
+      $('#panel_loc_'+editKiosk_marker_id).text(lat.toFixed(5) + ";" + lng.toFixed(5));
+      markers[editKiosk_marker_id].bindPopup('<b>Name:</b> '+ kiosks[editKiosk_marker_id]['name'] +'</span><br /><b>Category:</b> '+ kiosks[editKiosk_marker_id]['category'] +'</span><br /><b>Location:</b> ' + kiosks[editKiosk_marker_id]['lat'].toFixed(5) + ";" + kiosks[editKiosk_marker_id]['lng'].toFixed(5) + '</span>');
+
       $('#showPromptEditKioskModal').modal('hide');
     }
 
     function deleteKiosk(marker_id) {
-      mymap.removeLayer(markers[marker_id]);
-      mymap.removeLayer(circles[marker_id]);
+      markerLayerGroup.removeLayer(markers[marker_id]);
+      circleLayerGroup.removeLayer(circles[marker_id]);
       delete markers[marker_id];
       delete circles[marker_id];
       $("#panel_"+marker_id).remove();
-      renderRoutes();
       if (Object.keys(markers).length == 1) {
         $("#routenetwork").hide();
       }
     }
 
     function selectKioskLocationOnMapHandler() {
-      console.log("HELLO");
       $('#showPromptNewKioskModal').modal('hide');
       $('#kiosks').hide();
+      mymap.off('click');
       mymap.on('click', function (e) {
         $('#showPromptNewKioskModalBodyLat').val(e.latlng.lat);
         $('#showPromptNewKioskModalBodyLng').val(e.latlng.lng);
-        console.log(e.latlng);
         $('#kiosks').show();
         $('#showPromptNewKioskModal').modal('show');
         mymap.off('click');
+        mymap.on('click', addLocationsToAvoid);
       });
     }
 
     function editKioskLocationOnMapHandler() {
       $('#showPromptEditKioskModal').modal('hide');
       $('#kiosks').hide();
+      mymap.off('click');
       mymap.on('click', function (e) {
         $('#editKioskForm_lat').val(e.latlng.lat);
         $('#editKioskForm_lng').val(e.latlng.lng);
         $('#kiosks').show();
         $('#showPromptEditKioskModal').modal('show');
         mymap.off('click');
+        mymap.on('click', addLocationsToAvoid);
       });
     }
 
@@ -421,39 +461,54 @@
       $('#showPromptNewKioskModal').modal('hide');
     }
 
-
+    var markerLayerGroup = L.layerGroup().addTo(mymap);
+    var circleLayerGroup = L.layerGroup().addTo(mymap);
     function placeKiosk(name, category, lat, lng) {
       $('#routenetwork').show();
 
       var marker = L.marker([lat, lng], {
         draggable: true,
         autoPan: true,
-      }).addTo(mymap);
+      }).addTo(markerLayerGroup);
+      kiosks[marker._leaflet_id] = {'name': name, 'category': category, 'lat': lat, 'lng': lng};
 
-      marker.bindPopup('<span id="name_' +marker._leaflet_id+ '"><b>Name:</b> '+ name +'</span><br /><span id="category_' +marker._leaflet_id+ '"><b>Category:</b> '+ category +'</span><br /><span id="loc_' + marker._leaflet_id + '"><b>Location:</b> ' + lat.toFixed(5) + ";" + lng.toFixed(5) + '</span>');
+      marker.bindPopup('<b>Name:</b> '+ kiosks[marker._leaflet_id]['name'] +'</span><br /><b>Category:</b> '+ kiosks[marker._leaflet_id]['category'] +'</span><br /><b>Location:</b> ' + kiosks[marker._leaflet_id]['lat'].toFixed(5) + ";" + kiosks[marker._leaflet_id]['lng'].toFixed(5) + '</span>');
 
       marker.on('drag', function(e){
         circles[marker._leaflet_id].setLatLng([e.latlng.lat, e.latlng.lng]);
-        $('#loc_'+marker._leaflet_id).text(e.latlng.lat.toFixed(5) + ";" + e.latlng.lng.toFixed(5));
+        $('#panel_loc_'+marker._leaflet_id).text(e.latlng.lat.toFixed(5) + ";" + e.latlng.lng.toFixed(5));
         kiosks[marker._leaflet_id]['lat'] = e.latlng.lat;
         kiosks[marker._leaflet_id]['lng'] = e.latlng.lng;
+        marker.bindPopup('<b>Name:</b> '+ kiosks[marker._leaflet_id]['name'] +'</span><br /><b>Category:</b> '+ kiosks[marker._leaflet_id]['category'] +'</span><br /><b>Location:</b> ' + kiosks[marker._leaflet_id]['lat'].toFixed(5) + ";" + kiosks[marker._leaflet_id]['lng'].toFixed(5) + '</span>');
       });
       markers[marker._leaflet_id] = marker;
-      kiosks[marker._leaflet_id] = {'name': name, 'category': category, 'lat': lat, 'lng': lng};
-      marker.on('dragend', function(e){
-        addMarker(markers, marker._leaflet_id);
+      marker.on('click', function(e){
+        if (markers_selected.length == 2) {
+          markers_selected.shift().setOpacity(1);
+        }
+        markers_selected.push(marker);
+        marker.setOpacity(0.5);
+        if (markers_selected.length >= 1) {
+          let curr_marker = markers_selected[0];
+          $('#connectKiosksDiv_marker1').text(kiosks[curr_marker._leaflet_id]['name']);
+        }
+        if (markers_selected.length == 2) {
+          let curr_marker = markers_selected[1];
+          $('#connectKiosksDiv_marker2').text(kiosks[curr_marker._leaflet_id]['name']);
+        }
       });
+      // marker.on('dragend', function(e){
+      //   drawPolyline(marker._leaflet_id);
+      // });
       var circle = L.circle([lat, lng], {
         color: 'red',
         fillColor: '#f03',
         fillOpacity: 0.3,
         radius: 402.336 // 0.25 miles in meters
-      }).addTo(mymap);
+      }).addTo(circleLayerGroup);
       circles[marker._leaflet_id] = circle;
 
-      $("#listkiosks").append('<div class="panel-body" id="panel_'+marker._leaflet_id+'"><button type="button" class="btn btn-outline-info" onclick="moveToKiosk('+ marker._leaflet_id +')"><span id="name_' +marker._leaflet_id+ '"><b>Name:</b> '+ name +'</span><br /><span id="category_' +marker._leaflet_id+ '"><b>Category:</b> '+ category +'</span><br /><span id="loc_' + marker._leaflet_id + '"><b>Location:</b> ' + lat.toFixed(5) + ";" + lng.toFixed(5) + '</span></button><button onclick="editKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-pen-to-square fa-lg"></i></button><button onclick="deleteKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-trash-can fa-lg"></i></button></div>');
-
-      addMarker(markers, marker._leaflet_id);
+      $("#listkiosks").append('<div class="panel-body" id="panel_'+marker._leaflet_id+'"><button type="button" class="btn btn-outline-info" onclick="moveToKiosk('+ marker._leaflet_id +')"><b>Name:</b> <span id="panel_name_' +marker._leaflet_id+ '">'+ name +'</span><br /><b>Category:</b> <span id="panel_category_' +marker._leaflet_id+ '">'+ category +'</span><br /><b>Location:</b> <span id="panel_loc_' + marker._leaflet_id + '">' + lat.toFixed(5) + ";" + lng.toFixed(5) + '</span></button><button onclick="editKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-pen-to-square fa-lg"></i></button><button onclick="deleteKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-trash-can fa-lg"></i></button></div>');
     };
 
     function renderHeatmap(response) {
@@ -497,8 +552,8 @@
       return result;
     }
 
-    var curr_route_key;
 
+    // var curr_route_key;
     // var duration_table_view = 'minutes';
     // function updateDurationTable() {
     //   if (duration_table_view == 'minutes') {
@@ -509,83 +564,141 @@
     //   }
     // }
 
-    function cleanRouteDicts() {
-      var lst_latlngs = [];
-      for (let key in markers) {
-        latlng = markers[key].getLatLng();
-        lst_latlngs.push([latlng.lat, latlng.lng]);
-      }
-      for (key in routes_dict) {
-        str_lat_lng1 = key.split(";")[0].split(",");
-        lat_lng1 = [parseFloat(str_lat_lng1[0]), parseFloat(str_lat_lng1[1])];
-        str_lat_lng2 = key.split(";")[1].split(",");
-        lat_lng2 = [parseFloat(str_lat_lng2[0]), parseFloat(str_lat_lng2[1])];
-        if (!(lst_latlngs.some(elem => JSON.stringify(elem) === JSON.stringify(lat_lng1)) && lst_latlngs.some(elem => JSON.stringify(elem) === JSON.stringify(lat_lng2)))) {
-          delete routes_dict[key];
-        }
-      }
-    }
+    // function cleanRouteDicts() {
+    //   var lst_latlngs = [];
+    //   for (let key in markers) {
+    //     latlng = markers[key].getLatLng();
+    //     lst_latlngs.push([latlng.lat, latlng.lng]);
+    //   }
+    //   for (key in routes_dict) {
+    //     str_lat_lng1 = key.split(";")[0].split(",");
+    //     lat_lng1 = [parseFloat(str_lat_lng1[0]), parseFloat(str_lat_lng1[1])];
+    //     str_lat_lng2 = key.split(";")[1].split(",");
+    //     lat_lng2 = [parseFloat(str_lat_lng2[0]), parseFloat(str_lat_lng2[1])];
+    //     if (!(lst_latlngs.some(elem => JSON.stringify(elem) === JSON.stringify(lat_lng1)) && lst_latlngs.some(elem => JSON.stringify(elem) === JSON.stringify(lat_lng2)))) {
+    //       delete routes_dict[key];
+    //     }
+    //   }
+    // }
 
-    var allRouteLayerGroups = {};
-    var total_distance = 0;
+    // var total_distance = 0;
+    //
+    // var routeLayerGroup = L.layerGroup().addTo(mymap);
+    // function renderRoutes() {
+    //   cleanRouteDicts();
+    //   total_distance = 0;
+    //   routeLayerGroup.clearLayers();
+    //   for (let key in routes_dict) {
+    //     let latlngs = routes_dict[key].latlngs;
+    //     let distance = routes_dict[key].distance / 1609.34; // convert from meters to miles
+    //     total_distance += distance;
+    //     let duration = routes_dict[key].duration / 60; // convert from seconds to minutes
+    //     var polyline = L.polyline(latlngs, {color: 'blue', weight: 3}).bindTooltip("Distance: <b>"+distance.toFixed(2)+" miles</b><br>Duration: <b>"+duration.toFixed(2)+" minutes</b>", {
+    //     	sticky: true
+    //     }).addTo(routeLayerGroup);
+    //     polyline.on('mouseover', function(e) {
+    //       var layer = e.target;
+    //       layer.setStyle({
+    //           color: 'red',
+    //           weight: 5
+    //       });
+    //     });
+    //     polyline.on('mouseout', function(e) {
+    //       var layer = e.target;
+    //       layer.setStyle({
+    //           color: 'blue',
+    //           weight: 3
+    //       });
+    //     });
+    //   }
+    //   $('#num_road_miles').text(total_distance.toFixed(2));
+    //   //updateDurationTable();
+    // }
 
-    var routeLayerGroup = L.layerGroup().addTo(mymap);
-    function renderRoutes() {
-      cleanRouteDicts();
-      total_distance = 0;
-      routeLayerGroup.clearLayers();
-      for (let key in routes_dict) {
-        let latlngs = routes_dict[key].latlngs;
-        let distance = routes_dict[key].distance / 1609.34; // convert from meters to miles
-        total_distance += distance;
-        let duration = routes_dict[key].duration / 60; // convert from seconds to minutes
-        var polyline = L.polyline(latlngs, {color: 'blue', weight: 3}).bindTooltip("Distance: <b>"+distance.toFixed(2)+" miles</b><br>Duration: <b>"+duration.toFixed(2)+" minutes</b>", {
-        	sticky: true
-        }).addTo(routeLayerGroup);
-        polyline.on('mouseover', function(e) {
-          var layer = e.target;
-          layer.setStyle({
-              color: 'red',
-              weight: 5
-          });
-        });
-        polyline.on('mouseout', function(e) {
-          var layer = e.target;
-          layer.setStyle({
-              color: 'blue',
-              weight: 3
-          });
-        });
-      }
-      $('#num_road_miles').text(total_distance.toFixed(2));
-      //updateDurationTable();
-    }
 
     var request_routes = null;
-    function addMarker(lst_markers, new_marker_key) {
-      var lst_latlngs = [];
-      for (let key in lst_markers) {
-        latlng = lst_markers[key].getLatLng();
-        lst_latlngs.push([latlng.lat, latlng.lng]);
+    var markers_selected = [];
+    function getRoute() {
+      if (markers_selected.length != 2) {
+        alert("Must select two markers to connect.");
+        return;
       }
-      let new_marker = [lst_markers[new_marker_key].getLatLng().lat, lst_markers[new_marker_key].getLatLng().lng];
-      lst_latlngs_encoded = encodeURIComponent(lst_latlngs);
-      var url = '/get_routes?lst_latlngs=' + lst_latlngs_encoded
-        + '&new_marker=' + new_marker
+      let marker1 = markers_selected[0];
+      let marker2 = markers_selected[1];
+      if (marker1 == marker2) {
+        alert("Cannot connect a marker to itself.");
+      }
+      else {
+        var avoidLocationsArray = [];
+        avoidLocationsLayerGroup.eachLayer(function (marker) {
+            avoidLocationsArray.push({'lat': marker.getLatLng().lat, 'lon': marker.getLatLng().lng});
+        });
+        var submitData = {
+          "latlng1": [marker1.getLatLng().lat, marker1.getLatLng().lng],
+          "latlng2": [marker2.getLatLng().lat, marker2.getLatLng().lng],
+          "avoidLocations": avoidLocationsArray
+        };
 
-      request_routes = $.ajax(
-        {
-          type: 'GET',
-          url: url,
-          success: addNewRoutes
-        }
-      );
+        console.log(submitData);
+
+        request_routes = $.ajax({
+          type: "POST",
+          url: "/get_route",
+          data: JSON.stringify(submitData),
+          contentType: "application/json",
+          dataType: 'json',
+          success: drawRoute
+        });
+      }
     }
 
+    var total_distance = 0;
+    var polylineLayerGroup = L.layerGroup().addTo(mymap);
     var routes_dict = {};
-    function addNewRoutes(response) {
-      Object.assign(routes_dict, response);
-      renderRoutes();
+    function drawRoute(response) {
+      console.log(response);
+      // Save response for when we create simulation
+      let key = response['key'];
+      delete response['key'];
+      routes_dict[key] = response;
+
+      // Render polyline
+      let latlngs = response.latlngs;
+      let distance = response.distance;
+      total_distance += distance;
+      let duration = response.duration / 60; // convert from seconds to minutes
+      var polyline = L.polyline(latlngs, {color: 'blue', weight: 3}).bindTooltip("Distance: <b>"+distance.toFixed(2)+" miles</b><br>Duration: <b>"+duration.toFixed(2)+" minutes</b>", {
+        sticky: true
+      }).addTo(polylineLayerGroup);
+      polyline.on('mouseover', function(e) {
+        var layer = e.target;
+        layer.setStyle({
+            color: 'red',
+            weight: 5
+        });
+      });
+      polyline.on('mouseout', function(e) {
+        var layer = e.target;
+        layer.setStyle({
+            color: 'blue',
+            weight: 3
+        });
+      });
+      polyline.on('click', function(e){
+        polylineLayerGroup.removeLayer(polyline);
+        delete routes_dict[key];
+        total_distance -= distance;
+        $('#num_road_miles').text(total_distance.toFixed(2));
+      });
+      $('#num_road_miles').text(total_distance.toFixed(2));
+
+      // // Reset markers_selected
+      // let marker = markers_selected.shift();
+      // marker.setOpacity(1);
+      // marker.closePopup();
+      // marker = markers_selected.shift();
+      // marker.setOpacity(1);
+      // marker.closePopup();
     }
 
     function drawPrecalculatedKiosksSuccess(response) {
@@ -620,7 +733,7 @@
 
 
     function drawH3PolygonsSuccess(response) {
-      var h3Grid = L.polygon(response["lst_polygons"], {color: 'orange'}).addTo(mymap);
+      var h3Grid = L.polygon(response["lst_polygons"], {color: 'orange', fillOpacity: 0}).addTo(mymap);
       extractPersonTrips();
     }
 
@@ -701,7 +814,7 @@
     });
 
     function submitKiosksHandler(response) {
-      $('#submitModalBody').html("<p>Runtime: "+ response['runtime'] +" seconds</p><br />Proceed to <a href='/animation?city_choice=TRENTON_TESTING'>animation</a>");
+      $('#submitModalBody').html("<p>Runtime: "+ response['runtime'] +" seconds</p><br />Proceed to <a href='/animation?city_choice="+locality_name+"'>animation</a>");
     }
 
     function submitKiosks() {
@@ -710,6 +823,8 @@
         latlng = markers[key].getLatLng();
         lst_marker_latlngs.push([latlng.lat, latlng.lng]);
       };
+
+      console.log(routes_dict);
 
       var submitData = {
         "city_name": locality_name,
@@ -734,7 +849,36 @@
       });
     }
 
-    //mymap.on('click', placeKiosk);
+    function saveODDHandler(response) {
+      alert(response['message']);
+    }
+
+    var request_save_ODD = null;
+    function saveODD() {
+      var avoidLocationsGeoJSON = avoidLocationsLayerGroup.toGeoJSON();
+      var markersGeoJSON = markerLayerGroup.toGeoJSON();
+      var circlesGeoJSON = circleLayerGroup.toGeoJSON();
+      var polylinesGeoJSON = polylineLayerGroup.toGeoJSON();
+
+      var submitData = {
+        "city_name": locality_name,
+        "avoidLocationsGeoJSON": avoidLocationsGeoJSON,
+        "markersGeoJSON": markersGeoJSON,
+        "circlesGeoJSON": circlesGeoJSON,
+        "polylinesGeoJSON": polylinesGeoJSON
+      }
+
+      request_save_ODD = $.ajax({
+        type: "POST",
+        url: "/save_ODD",
+        data: JSON.stringify(submitData),
+        contentType: "application/json",
+        dataType: 'json',
+        success: saveODDHandler
+      });
+    }
+
+    mymap.on('click', addLocationsToAvoid);
 
     mymap.zoomControl.setPosition('bottomright');
 
