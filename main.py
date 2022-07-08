@@ -602,7 +602,7 @@ def create_animation(CITY_NAME):
 
 @app.route("/animation")
 def my_index():
-    with open("local_static/trips.json", "r") as f:
+    with open("static/PERTH_AMBOY_TESTING/trips.json", "r") as f:
         trips = json.load(f)
 
     html = render_template("index.html", trips=trips)
