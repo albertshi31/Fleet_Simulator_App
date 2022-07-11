@@ -1,45 +1,37 @@
 class Passenger:
-    def __init__(self, lat, lon, dest_lat, dest_lon, departure_time, profile):
+    def __init__(self, personID, lat, lng, dest_lat, dest_lng, oxcoord, oycoord, dxcoord, dycoord, odeparturetime, max_delay):
+        self.personID = personID
         self.lat = lat
-        self.lon = lon
+        self.lng = lng
         self.dest_lat = dest_lat
-        self.dest_lon = dest_lon
-        self.departure_time = departure_time
-        self.vehicle_departure_time = None
-        self.depot = None
-        # self.lst_h3_indices_origin = []
-        # self.lst_h3_indices_destination = []
-        self.dest_depot = None
-        self.active = True
-        self.profile = int(profile)
-        self.distance_if_taken_alone = None
-        self.distance_in_rideshare = None
-        self.setProfileAttr()
-
-    def setProfileAttr(self):
-        if self.profile == 0:
-            self.delay = 2
-            self.miss = .1
-        elif self.profile == 1:
-            self.delay = 5
-            self.miss = .3
-        else:
-            self.delay = 10
-            self.miss = .5
+        self.dest_lng = dest_lng
+        self.oxcoord = oxcoord
+        self.oycoord = oycoord
+        self.dxcoord = dxcoord
+        self.dycoord = dycoord
+        self.odeparturetime = odeparturetime
+        self.max_delay = max_delay
+        self.missed = False
 
     def __str__(self):
-        return "Location: ({0}, {1})\nProfile: {2} Delay: {3} Miss: {4}\nDeparture Time: {5}\nActive?: {6}\n".format(self.lat, self.lon, self.profile, self.delay, self.miss, self.departure_time, self.active)
+        return "PersonID: {}\nOXYCoords: ({}, {})\nDXYCoords: ({}, {})\nODepartureTime: {}\nMax Delay: {}\n".format(self.personID, self.oxcoord, self.oycoord, self.dxcoord, self.dycoord, self.odeparturetime, self.max_delay)
 
-    def getLocation(self):
-        return (self.lat, self.lon)
+    def getOXYPixelCoords(self):
+        return (self.oxcoord, self.oycoord)
 
-    def setProfile(self, profile):
-        self.profile = profile
-        self.setProfileAttr()
+    def getDXYPixelCoords(self):
+        return (self.dxcoord, self.dycoord)
 
-    def setActive(self, bool):
-        self.active = bool
+    def setOKiosk(self, kiosk):
+        self.kiosk = kiosk
 
-    def getAnimationDetails(self):
-        result = {'pas_idx': id(self), 'lat': self.lat, 'lng': self.lon, 'dest_lat': self.dest_lat, 'dest_lng': self.dest_lon}
-        return result
+    def setDKiosk(self, kiosk):
+        self.dest_kiosk = kiosk
+
+    def setMissed(self):
+        self.missed = True
+
+    def setAloneAndMaxTravelTimes(self, alone_triptime):
+        self.alone_triptime = alone_triptime
+        self.total_triptime = self.alone_triptime
+        self.max_triptime = self.alone_triptime * (1 + self.max_delay)

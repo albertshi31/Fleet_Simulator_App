@@ -13,12 +13,17 @@ import shutil
 from DepotMatrixAndBuildings import DepotMatrixAndBuildings
 #from SortRoutesByPriority import Graph
 import h3
-from random import sample
+from random import sample, random
 import polyline
 import numpy as np
 from ratelimiter import RateLimiter
 
 from Dispatcher import Dispatcher
+from Passenger import Passenger
+from Kiosk import Kiosk
+
+from helper_functions import create_pixel_grid, latlng_to_xypixel, xypixel_to_latlng
+import pandas as pd
 
 global THIS_FOLDER
 THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
@@ -88,44 +93,13 @@ def isInBoundsLatLng(lat, lng, min_lat, max_lat, min_lng, max_lng):
 
 def filter_person_trip_files(list_of_unzipped_files):
     global person_trip_lst_latlngs
-    global person_trip_lst_latlngs_by_h3_index
-    person_trip_lst_latlngs_by_h3_index = {}
-    global lst_h3_indices
-    global h3_resolution
-    global person_trips_in_kiosk_network
-    global person_trips_csv_header
-    person_trips_in_kiosk_network = []
     person_trip_lst_latlngs = []
     for filename in list_of_unzipped_files:
-        with open(filename, 'r', encoding='utf-8-sig') as file:
-            csvreader = csv.reader(file)
-            header = next(csvreader)
-            person_trips_csv_header = header
-            lat_idx = header.index("OLat")
-            long_idx = header.index("OLon")
-            dest_lat_idx = header.index("DLat")
-            dest_long_idx = header.index("DLon")
-            gcdistance_idx = header.index("GCDistance")
-            for row in csvreader:
-                lat = float(row[lat_idx])
-                lng = float(row[long_idx])
-                dest_lat = float(row[dest_lat_idx])
-                dest_lng = float(row[dest_long_idx])
-                gcdistance = float(row[gcdistance_idx])
-                origin_h3_index = h3.geo_to_h3(lat, lng, h3_resolution)
-                dest_h3_index = h3.geo_to_h3(dest_lat, dest_lng, h3_resolution)
-                if origin_h3_index in lst_h3_indices and dest_h3_index in lst_h3_indices and gcdistance > .707:
-                    person_trip_lst_latlngs.append([lat, lng])
-                    person_trip_lst_latlngs.append([dest_lat, dest_lng])
-                    person_trips_in_kiosk_network.append(row)
-                    if not origin_h3_index in person_trip_lst_latlngs_by_h3_index:
-                        person_trip_lst_latlngs_by_h3_index[origin_h3_index] = [[lat, lng]]
-                    else:
-                        person_trip_lst_latlngs_by_h3_index[origin_h3_index].append([lat, lng])
-                    if not dest_h3_index in person_trip_lst_latlngs_by_h3_index:
-                        person_trip_lst_latlngs_by_h3_index[dest_h3_index] = [[dest_lat, dest_lng]]
-                    else:
-                        person_trip_lst_latlngs_by_h3_index[dest_h3_index].append([dest_lat, dest_lng])
+        df = pd.read_csv(filename)
+        lst_olatlngs = [(lat, lng) for lat, lng, dist in zip(df['OLat'], df['OLon'], df['GCDistance']) if dist > 0.707]
+        person_trip_lst_latlngs.extend(lst_olatlngs)
+        lst_dlatlngs = [(lat, lng) for lat, lng, dist in zip(df['DLat'], df['DLon'], df['GCDistance']) if dist > 0.707]
+        person_trip_lst_latlngs.extend(lst_dlatlngs)
 
 
 #decode an encoded string
@@ -173,55 +147,58 @@ def getTimestamps(lst_route_leg_maneuvers, route_duration, len_route_latlngs):
     return raw_timestamps
 
 
-def getRouteMeta(latlng1, latlng2, avoidLocations):
-    # loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
-    # url = "http://127.0.0.1:5000/route/v1/driving/"
-    # r = requests.get(url + loc + "?overview=full&annotations=true&exclude=motorway")
-    # raw_timestamps = res['routes'][0]['legs'][0]['annotation']['duration']
-    # raw_timestamps.insert(0, 0) # raw_timestamps gives list of times you should add to previous sum
-    # route_timestamps = list(np.cumsum(raw_timestamps))
-    #
-    # route_latlngs = polyline.decode(res['routes'][0]['geometry'])
-    # route_distance = res['routes'][0]['distance']
-    # route_duration = res['routes'][0]['duration']
-
-    valhalla_route_dict = {
-      "locations": [
-        {
-          "lat": latlng1[0],
-          "lon": latlng1[1]
-        },
-        {
-          "lat": latlng2[0],
-          "lon": latlng2[1]
-        }
-      ],
-      "costing": "auto",
-      "costing_options": {
-        "auto": {
-          "use_highways": 0,
-          "use_tolls": 0,
-          "top_speed": 45 * 1.609, # convert from mph to kph
-        }
-      },
-      "exclude_locations": avoidLocations,
-      "units": "miles",
-      "id": "my_work_route"
-    }
-    url = "https://valhalla1.openstreetmap.de/route?json={}".format(json.dumps(valhalla_route_dict))
-    print("URL", url)
-    r = requests.get(url)
-    if r.status_code != 200:
-        print("VALHALLA RETURNED ERROR", r.status_code)
-        print(r.json()['error'])
-        return {}
+def getRouteMeta(latlng1, latlng2):
+    loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
+    url = "http://127.0.0.1:5000/route/v1/driving/"
+    r = requests.get(url + loc + "?overview=full&annotations=true&exclude=motorway")
     res = r.json()
-    route_latlngs = decode(res['trip']['legs'][0]['shape'])
-    route_distance = res['trip']['summary']['length']
-    route_duration = res['trip']['summary']['time']
-    route_timestamps = getTimestamps(res['trip']['legs'][0]['maneuvers'], route_duration, len(route_latlngs))
+    raw_timestamps = res['routes'][0]['legs'][0]['annotation']['duration']
+    raw_timestamps.insert(0, 0) # raw_timestamps gives list of times you should add to previous sum
+    route_timestamps = [float(elem) for elem in list(np.cumsum(raw_timestamps))]
+
+    route_latlngs = polyline.decode(res['routes'][0]['geometry'])
+    route_distance = res['routes'][0]['distance']
+    route_duration = res['routes'][0]['duration']
 
     return route_latlngs, route_distance, route_duration, route_timestamps
+    #
+    # valhalla_route_dict = {
+    #   "locations": [
+    #     {
+    #       "lat": latlng1[0],
+    #       "lon": latlng1[1]
+    #     },
+    #     {
+    #       "lat": latlng2[0],
+    #       "lon": latlng2[1]
+    #     }
+    #   ],
+    #   "costing": "auto",
+    #   "costing_options": {
+    #     "auto": {
+    #       "use_highways": 0,
+    #       "use_tolls": 0,
+    #       "top_speed": 45 * 1.609, # convert from mph to kph
+    #     }
+    #   },
+    #   "exclude_locations": avoidLocations,
+    #   "units": "miles",
+    #   "id": "my_work_route"
+    # }
+    # url = "https://valhalla1.openstreetmap.de/route?json={}".format(json.dumps(valhalla_route_dict))
+    # print("URL", url)
+    # r = requests.get(url)
+    # if r.status_code != 200:
+    #     print("VALHALLA RETURNED ERROR", r.status_code)
+    #     print(r.json()['error'])
+    #     return {}
+    # res = r.json()
+    # route_latlngs = decode(res['trip']['legs'][0]['shape'])
+    # route_distance = res['trip']['summary']['length']
+    # route_duration = res['trip']['summary']['time']
+    # route_timestamps = getTimestamps(res['trip']['legs'][0]['maneuvers'], route_duration, len(route_latlngs))
+    #
+    # return route_latlngs, route_distance, route_duration, route_timestamps
 
 def getNearestStreetCoordinate(latlng1):
     loc = "{},{}".format(latlng1[1], latlng1[0])
@@ -236,26 +213,39 @@ def getNearestStreetCoordinate(latlng1):
 @app.route("/get_route", methods=['POST'])
 def get_route():
     received_data = request.get_json()
-    latlng1 = received_data['latlng1']
-    latlng2 = received_data['latlng2']
-    avoidLocations = received_data['avoidLocations']
-    print(avoidLocations)
+    lst_latlngs = received_data['lst_latlngs']
 
-    rate_limiter = RateLimiter(max_calls=1, period=1)
-    with rate_limiter:
-        str_latlng1 = ','.join(str(x) for x in latlng1)
-        str_latlng2 = ','.join(str(x) for x in latlng2)
-        key = '{};{}'.format(str_latlng1, str_latlng2)
-        route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(latlng1, latlng2, avoidLocations)
-    response = {
-        'key': key,
-        'latlngs': route_latlngs,
-        'distance': route_distance,
-        'duration': route_duration,
-        'timestamps': route_timestamps
-    }
-    print(response)
-    return response
+    route_matrix = {}
+
+    for latlng1 in lst_latlngs:
+        for latlng2 in lst_latlngs:
+            key = str([(latlng1[0], latlng1[1]), (latlng2[0], latlng2[1])])
+            print(key)
+            route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(latlng1, latlng2)
+            route_matrix[key] = {
+                'key': key,
+                'latlngs': route_latlngs,
+                'distance': route_distance,
+                'duration': route_duration,
+                'timestamps': route_timestamps
+            }
+    return route_matrix
+
+    # rate_limiter = RateLimiter(max_calls=1, period=1)
+    # with rate_limiter:
+    #     str_latlng1 = ','.join(str(x) for x in latlng1)
+    #     str_latlng2 = ','.join(str(x) for x in latlng2)
+    #     key = '{};{}'.format(str_latlng1, str_latlng2)
+    #     route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(latlng1, latlng2, avoidLocations)
+    # response = {
+    #     'key': key,
+    #     'latlngs': route_latlngs,
+    #     'distance': route_distance,
+    #     'duration': route_duration,
+    #     'timestamps': route_timestamps
+    # }
+    # print(response)
+    # return response
 
 @app.route("/extract_person_trip_files")
 def extract_person_trip_files():
@@ -271,27 +261,27 @@ def extract_person_trip_files():
         input_datafeed_trip_data.append("local_static/" + trip_data_csv)
 
     filter_person_trip_files(input_datafeed_trip_data)
-    global person_trips_in_kiosk_network
-    return { "numTripsInKioskNetwork": len(person_trips_in_kiosk_network) }
+    global person_trip_lst_latlngs
+    return { "numTripsInKioskNetwork": len(person_trip_lst_latlngs) }
 
 
 @app.route("/get_heatmap")
 def get_heatmap():
     global person_trip_lst_latlngs
-    h3_dict = {}
+    pixel_dict = {}
     for lat, lng in person_trip_lst_latlngs:
-        h3_index = h3.geo_to_h3(lat, lng, 14) # Larger means more granular heatmap
-        if h3_index in h3_dict:
-            h3_dict[h3_index] += 1
+        xpixel, ypixel = latlng_to_xypixel(lat, lng)
+        if (xpixel, ypixel) in pixel_dict:
+            pixel_dict[(xpixel, ypixel)] += 1
         else:
-            h3_dict[h3_index] = 1
+            pixel_dict[(xpixel, ypixel)] = 1
 
     heatmap_data = {"max": 0, "min": 0, "data": []}
     max = 0
-    for key, value in h3_dict.items():
+    for key, value in pixel_dict.items():
         if value > max:
             max = value
-        lat, lng = h3.h3_to_geo(key)
+        lat, lng = xypixel_to_latlng(key[0], key[1])
         new_h3_heatmap_entry = {"lat": lat, "lng": lng, "count": value}
         heatmap_data["data"].append(new_h3_heatmap_entry)
     heatmap_data["max"] = max
@@ -299,20 +289,49 @@ def get_heatmap():
     return heatmap_data
 
 
-@app.route("/draw_h3_polygons", methods=['POST'])
-def draw_h3_polygons():
-    url_path = request.args.get('url_path')
-    print('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/' + url_path)
-    r = requests.get('https://raw.githubusercontent.com/whosonfirst-data/whosonfirst-data-admin-us/master/data/' + url_path)
-    geojson = {"type":r.json()['geometry']['type'],
-               "coordinates":r.json()['geometry']['coordinates']}
-    global lst_h3_indices
-    global h3_resolution
-    lst_h3_indices = h3.polyfill(geojson, h3_resolution, geo_json_conformant=True) # res of 8 gives roughly .25 mi^2 area hexagons
-    lst_polygons = []
-    for h3_index in lst_h3_indices:
-        lst_polygons.append([h3.h3_to_geo_boundary(h3_index)])
-    return { "lst_polygons": lst_polygons }
+@app.route("/get_pixel_grid")
+def get_pixel_grid():
+    north_lat = float(request.args.get("north"))
+    south_lat = float(request.args.get("south"))
+    east_lng = float(request.args.get("east"))
+    west_lng = float(request.args.get("west"))
+    geometry_collection = create_pixel_grid(north_lat, south_lat, east_lng, west_lng)
+
+    return { "pixel_grid_geojson": geometry_collection }
+
+@app.route("/get_geocoded_address")
+def get_geocoded_address():
+    name = request.args.get("name")
+    address = request.args.get("address")
+
+    # api-endpoint
+    URL = "http://localhost:8080/search.php"
+
+    # defining a params dict for the parameters to be sent to the API
+    PARAMS = {'q': address + " Neptune, NJ"}
+
+    # sending get request and saving the response as response object
+    r = requests.get(url = URL, params = PARAMS)
+
+    # extracting data in json format
+    data = r.json()
+
+    print(data)
+    success = True
+    lat, lng = 0, 0
+    try:
+        lat, lng = data[0]['lat'], data[0]['lon']
+    except:
+        success = False
+
+    response = {
+        "success": success,
+        "name": name,
+        "lat": lat,
+        "lng": lng
+    }
+
+    return response
 
 
 @app.route("/draw_precalculated_kiosks")
@@ -335,7 +354,6 @@ def save_ODD():
     received_data = request.get_json()
 
     city_name = received_data['city_name']
-    city_name = "PERTH_AMBOY_TESTING"
     avoidLocationsGeoJSON = received_data['avoidLocationsGeoJSON']
     markersGeoJSON = received_data['markersGeoJSON']
     circlesGeoJSON = received_data['circlesGeoJSON']
@@ -434,64 +452,51 @@ def prepare_simulation():
     received_data = request.get_json()
 
     CITY_NAME = received_data['city_name']
-    CITY_NAME = "PERTH_AMBOY_TESTING"
     county_name = received_data['county_name']
     state_name = received_data['state_name']
     center_lng_lat = received_data['center_lng_lat']
     lst_latlngs = received_data['lst_marker_latlngs']
     routes_dict = received_data['routes_dict']
-    lst_fleetsize = [int(elem) for elem in received_data['lst_fleetsize']]
-    modesplit = float(received_data['modesplit'])
-
-    # depot_matrix = getCompleteRoutesMatrix(lst_latlngs, routes_dict)
-    # print(depot_matrix)
-    with open("static/" + city_name + "/depotmatrix.json", "w") as f:
-        depot_matrix = json.load(f)
+    fleetsize = int(received_data['fleetsize'][0])
+    modesplit = float(received_data['modesplit']) / 100
+    pax_waittime_threshold = int(received_data['pax_waittime_threshold'])
+    max_circuity = float(received_data['max_circuity']) / 100
+    MAX_CAPACITY = 4
+    TIME_STEP = 1
+    lst_vehicle = []
 
     print(CITY_NAME, county_name, state_name, center_lng_lat, lst_latlngs)
+    print(routes_dict)
 
-    # Make the CITY_NAME folder to store files inside
-    shutil.rmtree(os.path.join(THIS_FOLDER, "static", CITY_NAME), ignore_errors=True)
-    os.mkdir(os.path.join(THIS_FOLDER, "static", CITY_NAME))
+    lst_kiosk_pixels = []
+    lst_kiosk = []
+    for idx, latlng in enumerate(lst_latlngs):
+        name, lat, lng = idx, latlng[0], latlng[1]
+        xpixel, ypixel = latlng_to_xypixel(lat, lng)
+        lst_kiosk_pixels.append((xpixel, ypixel))
+        lst_kiosk.append(Kiosk(name, lat, lng, xpixel, ypixel))
 
-    depot_data_filename = CITY_NAME+state_name+"_AV_Station.csv"
-    COL_FIELDS = ["Name", "Lat", "Long"]
-    with open(os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename), 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-        csvwriter.writerow(COL_FIELDS)
-        csvwriter.writerows([[idx, latlng[0], latlng[1]] for idx, latlng in enumerate(lst_latlngs)]) # Switch this to kiosks with names
+    lst_all_passengers = []
+    for filename in list_of_unzipped_files:
+        df = pd.read_csv("local_static/" + filename)
+        curr_lst_pax = [Passenger(personID, lat, lng, dest_lat, dest_lng, oxcoord, oycoord, dxcoord, dycoord, odeparturetime, max_circuity) for personID, lat, lng, dest_lat, dest_lng, oxcoord, oycoord, dxcoord, dycoord, odeparturetime in \
+        zip(df['Person ID'], df['OLat'], df['OLon'], df['DLon'], df['DLon'], df['OXCoord'], df['OYCoord'], df['DXCoord'], df['DYCoord'], df['ODepartureTime']) if (oxcoord, oycoord) in lst_kiosk_pixels and (dxcoord, dycoord) in lst_kiosk_pixels and (oxcoord, oycoord) != (dxcoord, dycoord) and random() <= modesplit]
+        lst_all_passengers.extend(curr_lst_pax)
 
-    # Create Depot Building Objects for Visualization
-    offset = 0.0002
-    height = 50
-    buildings = []
-    for depot in lst_latlngs:
-        polygon = [[depot[0]-offset, depot[0]+offset],
-                   [depot[0]+offset, depot[0]+offset],
-                   [depot[0]+offset, depot[0]-offset],
-                   [depot[0]-offset, depot[0]-offset]]
-        polygon = [[elem[1], elem[0]] for elem in polygon]
-        buildings.append({"height": height, "polygon": polygon, "m": "Depot"})
+    lst_all_passengers.sort(key=lambda pax:pax.odeparturetime)
 
-    with open("static/" + CITY_NAME + "/depotbuildings.json", "w") as f:
-        json.dump(buildings, f)
+    # get the start datetime
+    start_time = time.time()
 
-    global person_trips_in_kiosk_network
-    global person_trips_csv_header
+    dispatcher = Dispatcher(lst_all_passengers, lst_kiosk, lst_vehicle, pax_waittime_threshold, routes_dict, fleetsize, MAX_CAPACITY, TIME_STEP)
+    dispatcher.runSimulation()
 
-    create_animation_dict = {
-        'CITY_NAME': CITY_NAME,
-        'depot_data_filename': depot_data_filename,
-        'depot_matrix': depot_matrix,
-        'person_trips_in_kiosk_network': person_trips_in_kiosk_network,
-        'person_trips_csv_header': person_trips_csv_header,
-        'modesplit': modesplit,
-        'lst_fleetsize': lst_fleetsize,
-        'center_lng_lat': center_lng_lat
+    # get execution time
+    runtime=time.time()-start_time
+
+    response = {
+    'runtime': runtime
     }
-
-    saveCreateAnimationDict(create_animation_dict)
-    response = create_animation(CITY_NAME)
     return response
 
 def saveCreateAnimationDict(create_animation_dict):
@@ -602,7 +607,7 @@ def create_animation(CITY_NAME):
 
 @app.route("/animation")
 def my_index():
-    with open("static/PERTH_AMBOY_TESTING/trips.json", "r") as f:
+    with open("trips.json", "r") as f:
         trips = json.load(f)
 
     html = render_template("index.html", trips=trips)

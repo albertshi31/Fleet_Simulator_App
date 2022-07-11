@@ -1,94 +1,132 @@
+import numpy as np
+import math
+
 class Vehicle:
-    def __init__(self, lat=None, lon=None, capacity=4, SoC=100):
+    def __init__(self, lat=None, lng=None, MAX_CAPACITY=4, kiosk=None):
+        # Initialization variables
         self.lat = lat
-        self.lon = lon
-        self.depot = None
-        self.capacity = capacity
-        self.SoC = SoC
-        self.active = False
-        self.current_passenger = None
-        # Trip Info
-        self.trip_latlngs = None
-        self.trip_distance = None
+        self.lng = lng
+        self.kiosk = kiosk
+        self.MAX_CAPACITY = MAX_CAPACITY
+
+        #  Trip data
+        self.lst_passengers = []
+        self.curr_trip = []
+        self.lst_arrival_times_by_kiosk = []
+        self.num_passengers = 0
         self.trip_duration = None
-        self.arrival_at_depot_time = 0
-        # Next Destination
-        self.dest_lat = None
-        self.dest_lon = None
-        self.route_latlngs = None
-        self.route_distance = None
-        self.route_duration = None
-        # List of Destinations
-        self.total_num_destinations = None
-        self.num_destinations_remaining = None
-        self.lst_lat = None
-        self.lst_lon = None
-        self.lst_route_latlngs = None
-        self.lst_route_distance = None
-        self.lst_route_duration = None
-        self.lst_passengers = None
-        self.num_passengers = None
+        self.lst_leg_durations = []
+        self.trip_distance = None
+        self.lst_leg_distances = []
+        self.lst_leg_latlngs = []
+        self.lst_leg_timestamps = []
+        self.enroute = False
+
+        # Animation data
+        self.popup_content = {}
+        self.trips = []
 
     def __str__(self):
-        return "Location: {0}\nCapacity: {1}\nSoC: {2}\nActive?: {3}\n".format((self.lat, self.lon), self.capacity, self.SoC, self.active)
+        return "Location: ({},{})\nCurrent Kiosk: {}\nNumber of passengers: {}\nDestinations:{}\n"\
+            .format(self.lat,self.lng,self.kiosk.name,len(self.lst_passengers), self.curr_trip)
 
-    def getCurrentLocation(self):
-        return (self.lat, self.lon)
-
-    def setTrip(self, trip_latlngs, trip_distance, trip_duration, passengers):
-        self.trip_latlngs = trip_latlngs
-        self.trip_distance = trip_distance
+    def addTripLegs(self, lst_passengers, curr_trip, num_passengers, trip_duration, trip_distance, lst_leg_durations, lst_leg_distances, lst_leg_latlngs, lst_leg_timestamps, curr_time_in_sec):
+        assert self.enroute == False, "You cannot assign a new route to this vehicle until the last one has finished."
+        self.lst_passengers = lst_passengers
+        self.curr_trip = curr_trip.copy()
+        self.num_passengers = num_passengers
         self.trip_duration = trip_duration
-        self.lst_passengers = passengers
+        self.lst_leg_durations = lst_leg_durations.copy()
+        self.trip_distance = trip_distance
+        self.lst_leg_distances = lst_leg_distances.copy()
+        self.lst_arrival_times_by_kiosk = list(np.cumsum(lst_leg_durations) + curr_time_in_sec)
+        self.lst_leg_latlngs = lst_leg_latlngs.copy()
+        self.lst_leg_timestamps = lst_leg_timestamps.copy()
 
-    def getPaxIds(self):
-        lst_ids = []
-        for passenger in self.lst_passengers:
-            lst_ids.append(id(passenger))
-        return lst_ids
-
-    def setListDestinations(self, num_destinations, passengers, lst_lat, lst_lon, lst_route_latlngs, lst_route_distance, lst_route_duration):
-        self.total_num_destinations = num_destinations
-        self.num_destinations_remaining = num_destinations
-        self.lst_passengers = passengers
-        self.lst_lat = lst_lat
-        self.lst_lon = lst_lon
-        self.lst_route_latlngs = lst_route_latlngs
-        self.lst_route_distance = lst_route_distance
-        self.lst_route_duration = lst_route_duration
-
-    def moveToNextDestination(self):
-        curr_destination_index = self.total_num_destinations - self.num_destinations_remaining
-        self.current_passenger = self.lst_passengers[curr_destination_index]
-        self.dest_lat = self.lst_lat[curr_destination_index]
-        self.dest_lon = self.lst_lon[curr_destination_index]
-        self.route_latlngs = self.lst_route_latlngs[curr_destination_index]
-        self.route_distance = self.lst_route_distance[curr_destination_index]
-        self.route_duration = self.lst_route_duration[curr_destination_index]
-
-    def decreaseCapacity(self):
-        self.capacity -= 1
-
-    def decreaseSoC(self):
-        self.SoC = self.SoC - self.route_distance
-
-    def arrivedAtDestination(self):
-        self.num_destinations_remaining -= 1
-        self.decreaseSoC()
-        self.decreaseCapacity()
-
-        if self.num_destinations_remaining > 0:
-            self.moveToNextDestination()
-            return False
-        else:
+    def hasArrivedAtNewKiosk(self, curr_time_in_sec):
+        #print(self.lst_arrival_times_by_kiosk)
+        if self.lst_arrival_times_by_kiosk[0] <= curr_time_in_sec:
             return True
+        else:
+            return False
 
-    def setActive(self, bool):
-        self.active = bool
+    def isAtLastKiosk(self):
+        return len(self.curr_trip) == 0
 
-    def getAnimationDetails(self):
-        result = {'car_idx': id(self), 'latlngs': self.trip_latlngs, 'speed': self.trip_duration, 'lst_pax_id': self.getPaxIds(), 'distance': self.trip_distance}
-        return result
+    def updateKiosk(self):
+        new_kiosk = self.curr_trip[0]
+        self.kiosk = new_kiosk
+        self.lat = new_kiosk.lat
+        self.lng = new_kiosk.lng
+        return self.kiosk
 
-    def start(self):
-        self.active = True
+    def removeTripLeg(self):
+        self.curr_trip.pop(0)
+        self.lst_arrival_times_by_kiosk.pop(0)
+        self.trip_duration -= self.lst_leg_durations.pop(0)
+        self.trip_distance -= self.lst_leg_distances.pop(0)
+        self.lst_leg_latlngs.pop(0)
+        self.lst_leg_timestamps.pop(0)
+
+    def printTrip(self):
+        print("CURR TRIP:",self.curr_trip)
+        print("ARRIVAL TIMES:",self.lst_arrival_times_by_kiosk)
+        print("TRIP DURATION:",self.trip_duration)
+        print("TRIP DISTANCE:",self.trip_distance)
+        print("LEG LATLNGS:",self.lst_leg_latlngs)
+        print("LEG TIMESTAMPS:",self.lst_leg_timestamps)
+
+    def resetTrip(self):
+        self.lst_passengers = []
+        self.curr_trip = []
+        self.lst_arrival_times_by_kiosk = []
+        self.num_passengers = 0
+        self.trip_duration = None
+        self.lst_leg_durations = []
+        self.trip_distance = None
+        self.lst_leg_distances = []
+        self.lst_leg_latlngs = []
+        self.lst_leg_timestamps = []
+
+    def depart(self, curr_time_in_sec):
+        self.enroute = True
+        self.popup_content[curr_time_in_sec] = {
+            "num_passengers": self.num_passengers,
+            "passengers": [str(pax) for pax in self.lst_passengers],
+            "destinations": [str(kiosk) for kiosk in self.curr_trip],
+            "trip_duration": self.trip_duration,
+            "trip_distance": self.trip_distance,
+            "lst_leg_latlngs": self.lst_leg_latlngs,
+            "lst_leg_durations": self.lst_leg_durations
+        }
+        self.trips.append({
+            "num_passengers": self.num_passengers,
+            "lnglats": [[lng, lat] for lat, lng in self.lst_leg_latlngs[0]],
+            "timestamps": self.lst_leg_timestamps[0]
+        })
+
+
+    def arrive(self):
+        self.enroute = False
+
+    def isEnRoute(self):
+        return self.enroute
+
+    def getFinalKioskDestination(self):
+        assert len(self.curr_trip) > 0, "This vehicle currently has no destinations set"
+        return self.curr_trip[-1], self.lst_arrival_times_by_kiosk[-1]
+
+    def getDroppedOffPassengers(self):
+        passengers_that_are_dropped_off = []
+        for pax in self.lst_passengers:
+            if self.kiosk == pax.dest_kiosk:
+                passengers_that_are_dropped_off.append(pax)
+        return passengers_that_are_dropped_off
+
+    def removePassengers(self, lst_passenger_objects):
+        for pax in lst_passenger_objects:
+            self.lst_passengers.remove(pax)
+        self.num_passengers -= len(lst_passenger_objects)
+
+    def getTrips(self):
+        return self.trips

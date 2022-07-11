@@ -75,7 +75,7 @@
 
     .container {
       border-radius: 10px;
-      width: 40vw;
+      width: 35vw;
       max-width: 50vw;
     }
 
@@ -90,7 +90,6 @@
     }
 
     .btn-primary {
-      display: block;
       color: #fff;
       background-color: #007bff;
       border-color: #007bff;
@@ -134,14 +133,26 @@
               <input id="city_name" type="text" name="city_name" required></input>
               <br />
 
-              <label for="lst_fleetsize">Fleetsize(s)</label>
-              <input id="lst_fleetsize" type="text" name="lst_fleetsize" value="100" required></input>
+              <label for="fleetsize">Fleetsize</label>
+              <input id="fleetsize" type="text" name="fleetsize" value="100" required></input>
               <br />
 
               <label for="modesplit">Modesplit (%)</label>
               <input id="modesplit" type="number" name="modesplit" step="any" value="10" min="0" max="100" required></input>
               <small class="form-text text-muted">Randomly chooses X% of trips to serve using this network.</small>
               <br />
+
+              <label for="pax_waittime_threshold">Passenger Waittime Threshold (seconds)</label>
+              <input id="pax_waittime_threshold" type="number" name="pax_waittime_threshold" value="300" required></input>
+              <small class="form-text text-muted">Amount of time passengers wait before they leave.</small>
+              <br />
+
+              <label for="max_circuity">Max Circuity (%)</label>
+              <input id="max_circuity" type="number" name="max_circuity" step="any" value="20" min="0" max="100" required></input>
+              <small class="form-text text-muted">Amount of additional travel time passengers are willing to tolerate in carpooling.</small>
+              <br />
+
+
             <button type="submit" class="btn btn-primary">Submit</button>
           </form>
           </div>
@@ -198,6 +209,35 @@
     </div>
   </div>
 
+  <div class="modal fade" id="showPromptNewPOIModal" tabindex="-1" role="dialog" aria-labelledby="showPromptNewPOIModal" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Enter New POI</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body" id="showPromptNewPOIModalBody">
+          <div class="form-group">
+          <form id="createNewPOIForm">
+              <label for="POI_name">Name</label>
+              <input id="POI_name" type="text" name="POI_name" required></input>
+              <br />
+
+              <label for="POI_address">Address</label>
+              <input id="POI_address" type="text" name="POI_address" required></input>
+          </form>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button onclick="createNewPOIFormHandler()" class="btn btn-primary">Create POI</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal fade" id="showPromptEditKioskModal" tabindex="-1" role="dialog" aria-labelledby="showPromptEditKioskModal" aria-hidden="true">
     <div class="modal-dialog" role="document">
       <div class="modal-content">
@@ -247,27 +287,29 @@
   </div>
   <div class="container" id="kiosks">
     <div class="box">
-      <div id="avoidLocationsDiv">
+      <!-- <div id="avoidLocationsDiv">
         <input type="checkbox" name="avoidLocationsCheckbox" id="avoidLocationsCheckbox">
         <label for="avoidLocationsCheckbox">Add Locations to Avoid</label>
-      </div>
+      </div> -->
       <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#showPromptNewKioskModal">Add Kiosk</button>
+      <button type="button" class="btn btn-info" data-toggle="modal" data-target="#showPromptNewPOIModal">Add POI</button>
+
       <div class="my-custom-scrollbar" id="listkiosks">
         <div class="panel-heading">List of Kiosks:</div>
       </div>
       <div id="routenetwork">
-        Number of road miles to map: <span id="num_road_miles"></span> <br>
-        Number of Person Trips Served by Kiosk Network: <span id="numTripsInKioskNetwork"></span> <br>
+        <!-- Number of road miles to map: <span id="num_road_miles"></span> <br>
+        Number of Person Trips Served by Kiosk Network: <span id="numTripsInKioskNetwork"></span> <br> -->
         <!-- Least Dense<input id="routenetworkdensityslider" type="range" oninput="renderRoutes(this.value)">Most Dense -->
         <!-- <div id="distancematrix"></div><br> -->
         <!-- <button type="button" class="btn btn-info" onclick="duration_table_view='minutes'; updateDurationTable()">In Seconds</button> <button type="button" class="btn btn-info" onclick="duration_table_view='miles'; updateDurationTable()">In Miles</button> -->
       </div>
 
-      <div id="connectKiosksDiv">
+      <!-- <div id="connectKiosksDiv">
         Marker 1: <span id="connectKiosksDiv_marker1"></span><br />
-        Marker 2: <span id="connectKiosksDiv_marker2"></span><br />
+        Marker 2: <span id="connectKiosksDiv_marker2"></span><br /> --->
         <button type="button" class="btn btn-info" onclick="getRoute()">Connect Kiosks</button>
-      </div>
+      <!-- </div> --->
 
       <div class="btn-group" role="group" aria-label="Button Group">
         <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#showSubmitModal">Simulate Trips</button>
@@ -280,12 +322,12 @@
           Loading Heatmap...
         </button>
       </div>
-      <div class="loading-icon" id="loading_kiosks_icon">
+      <!-- <div class="loading-icon" id="loading_kiosks_icon">
         <button class="btn btn-primary" type="button" disabled>
           <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
           Loading Kiosks...
         </button>
-      </div>
+      </div> -->
     </div>
   </div>
 
@@ -370,7 +412,7 @@
 
         $("#city_name").val(locality_name+", "+state_name);
 
-        drawH3Polygons();
+        drawPixelGrid();
       },
       L: L,
     });
@@ -511,6 +553,39 @@
       $("#listkiosks").append('<div class="panel-body" id="panel_'+marker._leaflet_id+'"><button type="button" class="btn btn-outline-info" onclick="moveToKiosk('+ marker._leaflet_id +')"><b>Name:</b> <span id="panel_name_' +marker._leaflet_id+ '">'+ name +'</span><br /><b>Category:</b> <span id="panel_category_' +marker._leaflet_id+ '">'+ category +'</span><br /><b>Location:</b> <span id="panel_loc_' + marker._leaflet_id + '">' + lat.toFixed(5) + ";" + lng.toFixed(5) + '</span></button><button onclick="editKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-pen-to-square fa-lg"></i></button><button onclick="deleteKiosk('+marker._leaflet_id+')"><i class="fa-solid fa-trash-can fa-lg"></i></button></div>');
     };
 
+    function createNewPOISuccess(response) {
+      if (response["success"]) {
+        let lat = response["lat"];
+        let lng = response["lng"];
+        var marker = L.marker([lat, lng], {
+          draggable: true,
+          autoPan: true,
+          icon: redMarker
+        }).bindPopup('<b>Name:</b> '+ response["name"]).addTo(mymap);
+      }
+      else {
+        alert("Address geocoding failed. Please try again.");
+      }
+    }
+
+    function createNewPOIFormHandler() {
+      name = $('#POI_name').val();
+      address = $('#POI_address').val();
+      $('#showPromptNewPOIModal').modal('hide');
+
+      var submitData = {
+        "name": name,
+        "address": address
+      }
+
+      request_new_POI = $.ajax({
+        url: "/get_geocoded_address",
+        data: submitData,
+        dataType: 'json',
+        success: createNewPOISuccess
+      });
+    }
+
     function renderHeatmap(response) {
       var heatmap_data = response;
       var cfg = {
@@ -619,10 +694,31 @@
     var request_routes = null;
     var markers_selected = [];
     function getRoute() {
-      if (markers_selected.length != 2) {
-        alert("Must select two markers to connect.");
+      if (markers.length < 2) {
+        alert("Must have at least two markers to make road network.");
         return;
       }
+
+      var lst_marker_latlngs = [];
+      for (let key in markers) {
+        latlng = markers[key].getLatLng();
+        lst_marker_latlngs.push([latlng.lat, latlng.lng]);
+      };
+
+      var submitData = {
+        "lst_latlngs": lst_marker_latlngs
+      }
+
+      request_routes = $.ajax({
+        type: "POST",
+        url: "/get_route",
+        data: JSON.stringify(submitData),
+        contentType: "application/json",
+        dataType: 'json',
+        success: drawRoute
+      });
+      return;
+
       let marker1 = markers_selected[0];
       let marker2 = markers_selected[1];
       if (marker1 == marker2) {
@@ -656,49 +752,49 @@
     var polylineLayerGroup = L.layerGroup().addTo(mymap);
     var routes_dict = {};
     function drawRoute(response) {
-      console.log(response);
-      // Save response for when we create simulation
-      let key = response['key'];
-      delete response['key'];
-      routes_dict[key] = response;
+      polylineLayerGroup.clearLayers();
+      routes_dict = response;
+      for (let key in response) {
+        if (response[key].distance != 0) {
+          // Render polyline
+          let latlngs = response[key].latlngs;
+          let distance = response[key].distance / 1609.34;
+          total_distance += distance;
+          let duration = response[key].duration / 60; // convert from seconds to minutes
+          var polyline = L.polyline(latlngs, {color: 'blue', weight: 3}).bindTooltip("Distance: <b>"+distance.toFixed(2)+" miles</b><br>Duration: <b>"+duration.toFixed(2)+" minutes</b>", {
+            sticky: true
+          }).addTo(polylineLayerGroup);
+          polyline.on('mouseover', function(e) {
+            var layer = e.target;
+            layer.setStyle({
+                color: 'red',
+                weight: 5
+            });
+          });
+          polyline.on('mouseout', function(e) {
+            var layer = e.target;
+            layer.setStyle({
+                color: 'blue',
+                weight: 3
+            });
+          });
+          // polyline.on('click', function(e){
+          //   polylineLayerGroup.removeLayer(polyline);
+          //   delete routes_dict[key];
+          //   total_distance -= distance;
+          //   $('#num_road_miles').text(total_distance.toFixed(2));
+          // });
+          $('#num_road_miles').text(total_distance.toFixed(2));
 
-      // Render polyline
-      let latlngs = response.latlngs;
-      let distance = response.distance;
-      total_distance += distance;
-      let duration = response.duration / 60; // convert from seconds to minutes
-      var polyline = L.polyline(latlngs, {color: 'blue', weight: 3}).bindTooltip("Distance: <b>"+distance.toFixed(2)+" miles</b><br>Duration: <b>"+duration.toFixed(2)+" minutes</b>", {
-        sticky: true
-      }).addTo(polylineLayerGroup);
-      polyline.on('mouseover', function(e) {
-        var layer = e.target;
-        layer.setStyle({
-            color: 'red',
-            weight: 5
-        });
-      });
-      polyline.on('mouseout', function(e) {
-        var layer = e.target;
-        layer.setStyle({
-            color: 'blue',
-            weight: 3
-        });
-      });
-      polyline.on('click', function(e){
-        polylineLayerGroup.removeLayer(polyline);
-        delete routes_dict[key];
-        total_distance -= distance;
-        $('#num_road_miles').text(total_distance.toFixed(2));
-      });
-      $('#num_road_miles').text(total_distance.toFixed(2));
-
-      // // Reset markers_selected
-      // let marker = markers_selected.shift();
-      // marker.setOpacity(1);
-      // marker.closePopup();
-      // marker = markers_selected.shift();
-      // marker.setOpacity(1);
-      // marker.closePopup();
+          // // Reset markers_selected
+          // let marker = markers_selected.shift();
+          // marker.setOpacity(1);
+          // marker.closePopup();
+          // marker = markers_selected.shift();
+          // marker.setOpacity(1);
+          // marker.closePopup();
+        }
+      }
     }
 
     function drawPrecalculatedKiosksSuccess(response) {
@@ -732,76 +828,65 @@
     }
 
 
-    function drawH3PolygonsSuccess(response) {
-      var h3Grid = L.polygon(response["lst_polygons"], {color: 'orange', fillOpacity: 0}).addTo(mymap);
+    function drawPixelGridHandler(response) {
+      L.geoJSON(response["pixel_grid_geojson"], {
+          style: function (feature) {
+              return {
+                weight: 1,
+                opacity: 0.5,
+                interactive: false
+              };
+          }
+      }).addTo(mymap);
       extractPersonTrips();
     }
 
-    var request_draw_h3_polygons = null;
-    function drawH3Polygons() {
-      url_path = encodeURIComponent(url_path);
+    function drawPixelGrid() {
+      let map_bounds = mymap.getBounds();
 
-      var url = '/draw_h3_polygons?url_path=' + url_path
+      var submitData = {
+        "north": map_bounds.getNorth(),
+        "south": map_bounds.getSouth(),
+        "east": map_bounds.getEast(),
+        "west": map_bounds.getWest(),
+      }
 
-      console.log(url);
-
-      if (request_draw_h3_polygons != null) {
-           request_draw_h3_polygons.abort();
-      };
-
-      request_draw_h3_polygons = $.ajax(
-        {
-          type: 'POST',
-          url: url,
-          success: drawH3PolygonsSuccess
-        }
-      );
+      request_draw_pixel_grid = $.ajax({
+        url: "/get_pixel_grid",
+        data: submitData,
+        dataType: 'json',
+        success: drawPixelGridHandler
+      });
     }
 
     function extractPersonTripsSuccess(response) {
       $('#numTripsInKioskNetwork').text(response["numTripsInKioskNetwork"]);
       getHeatmap();
-      drawPrecalculatedKiosks();
+      //drawPrecalculatedKiosks();
     }
 
-    var request_person_trips_extract = null;
     function extractPersonTrips() {
-      county_name = encodeURIComponent(county_name);
-      state_name = encodeURIComponent(state_name);
-      //bbox = encodeURIComponent(bbox);
 
-      var url = '/extract_person_trip_files?county_name=' + county_name
-        + '&state_name=' + state_name
-
-      console.log(url);
-
-      if (request_person_trips_extract != null) {
-           request_person_trips_extract.abort();
-      };
+      var submitData = {
+        "county_name": county_name,
+        "state_name": state_name,
+      }
 
       request_person_trips_extract = $.ajax(
         {
-          type: 'GET',
-          url: url,
+          url: "/extract_person_trip_files",
+          data: submitData,
+          dataType: 'json',
           success: extractPersonTripsSuccess
         }
       );
     }
 
-    var request_heatmap = null;
     function getHeatmap() {
-      var url = '/get_heatmap'
-
-      console.log(url);
-
-      if (request_heatmap != null) {
-           request_heatmap.abort();
-      };
-
       request_heatmap = $.ajax(
         {
           type: 'GET',
-          url: url,
+          url: '/get_heatmap',
           success: renderHeatmap
         }
       );
@@ -814,10 +899,14 @@
     });
 
     function submitKiosksHandler(response) {
-      $('#submitModalBody').html("<p>Runtime: "+ response['runtime'] +" seconds</p><br />Proceed to <a href='/animation?city_choice="+locality_name+"'>animation</a>");
+      $('#submitModalBody').html("<p>Runtime: "+ response['runtime'] +" seconds</p><br />Proceed to <a href='/animation'>animation</a>");
     }
 
     function submitKiosks() {
+      if (routes_dict.length == 0) {
+        alert("Make sure to generate road network first.");
+        return;
+      }
       var lst_marker_latlngs = [];
       for (let key in markers) {
         latlng = markers[key].getLatLng();
@@ -833,8 +922,10 @@
         "center_lng_lat": center_lng_lat,
         "lst_marker_latlngs": lst_marker_latlngs,
         "routes_dict": routes_dict,
-        "lst_fleetsize": $('#lst_fleetsize').val().split(','),
-        "modesplit": $('#modesplit').val()
+        "fleetsize": $('#fleetsize').val(),
+        "modesplit": $('#modesplit').val(),
+        "pax_waittime_threshold": $("#pax_waittime_threshold").val(),
+        "max_circuity": $("#max_circuity").val()
       };
 
       console.log(submitData);
@@ -878,7 +969,7 @@
       });
     }
 
-    mymap.on('click', addLocationsToAvoid);
+    // mymap.on('click', addLocationsToAvoid);
 
     mymap.zoomControl.setPosition('bottomright');
 
