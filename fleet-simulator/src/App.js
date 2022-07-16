@@ -5,6 +5,7 @@ import {StaticMap} from 'react-map-gl';
 import {AmbientLight, PointLight, LightingEffect} from '@deck.gl/core';
 import DeckGL from '@deck.gl/react';
 import {TripsLayer} from '@deck.gl/geo-layers';
+import {IconLayer, GeoJsonLayer, TextLayer} from '@deck.gl/layers';
 
 function updateTime(time) {
   var period = "AM";
@@ -33,6 +34,38 @@ function updateTime(time) {
   $('#time').text(display_time);
 };
 
+function updateMetricAnimations(time) {
+  let timeframe_idx = (time - (time % TIME_STEP)).toString();
+
+  let vehicles_moving = timeframe_metrics[timeframe_idx]["vehicles_moving"];
+  $('#vehicles_moving').text(vehicles_moving.toLocaleString());
+
+  let vehicles_with_pax_moving = timeframe_metrics[timeframe_idx]["vehicles_with_pax_moving"];
+  $('#vehicles_with_pax_moving').text(vehicles_with_pax_moving.toLocaleString());
+
+  let empty_vehicles_moving = timeframe_metrics[timeframe_idx]["empty_vehicles_moving"];
+  $('#empty_vehicles_moving').text(empty_vehicles_moving.toLocaleString());
+
+  let vehicles_not_moving = timeframe_metrics[timeframe_idx]["vehicles_not_moving"];
+  $('#vehicles_not_moving').text(vehicles_not_moving.toLocaleString());
+
+  let total_pax = timeframe_metrics[timeframe_idx]["total_pax"];
+  $('#total_pax').text(total_pax.toLocaleString());
+
+  let pax_moving = timeframe_metrics[timeframe_idx]["pax_moving"];
+  $('#pax_moving').text(pax_moving.toLocaleString());
+
+  let pax_waiting = timeframe_metrics[timeframe_idx]["pax_waiting"];
+  $('#pax_waiting').text(pax_waiting.toLocaleString());
+
+  let pax_served_running_total = timeframe_metrics[timeframe_idx]["pax_served_running_total"];
+  $('#pax_served_running_total').text(pax_served_running_total.toLocaleString());
+
+  let pax_missed_running_total = timeframe_metrics[timeframe_idx]["pax_missed_running_total"];
+  $('#pax_missed_running_total').text(pax_missed_running_total.toLocaleString());
+};
+
+
 const ambientLight = new AmbientLight({
   color: [255, 255, 255],
   intensity: 1.0
@@ -56,17 +89,17 @@ const material = {
 const DEFAULT_THEME = {
   buildingColor: [175, 175, 175], // gray
   trailColor0: [255, 0, 0], // red
-  trailColor1: [252, 186, 3], // orange/gold
-  trailColor2: [0, 0, 139], // dark blue
-  trailColor3: [144, 238, 144], // light green
+  trailColor1: [230, 140, 0], // orange/gold
+  trailColor2: [200, 200, 0], // dark blue
+  trailColor3: [60, 200, 0], // light green
   trailColor4: [0, 100, 0], // dark green
   material,
   effects: [lightingEffect]
 };
 
 const INITIAL_VIEW_STATE = {
-  longitude: -74.05866,
-  latitude: 40.216635,
+  longitude: center_coordinates["lng"],
+  latitude: center_coordinates["lat"],
   zoom: 12,
   pitch: 45,
   bearing: 0
@@ -74,7 +107,14 @@ const INITIAL_VIEW_STATE = {
 
 const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
+const ICON_MAPPING = {
+  marker: {x: 0, y: 0, width: 512, height: 512, anchorY: 512}
+};
+
 function App({
+  kiosks = KIOSKS,
+  kiosk_metrics = KIOSK_METRICS,
+  road_network = ROAD_NETWORK,
   trips = TRIPS,
   trailLength = 10,
   initialViewState = INITIAL_VIEW_STATE,
@@ -91,6 +131,7 @@ function App({
   const [prevAnimationSpeed, setPrevAnimationSpeed] = useState(animationSpeed);
   const [time, setTime] = useState(startTime);
   updateTime(time);
+  updateMetricAnimations(time);
   const [animation] = useState({});
 
   const animate = () => {
@@ -108,6 +149,47 @@ function App({
 
   const trailColors = [theme.trailColor0, theme.trailColor1, theme.trailColor2, theme.trailColor3, theme.trailColor4];
   const layers = [
+    new GeoJsonLayer({
+      id: 'road-network',
+      data: road_network,
+      pickable: false,
+      lineWidthScale: 20,
+      getLineWidth: 1,
+      lineWidthMinPixels: 2,
+      getLineColor: [169, 169, 169, 100],
+      parameters: {depthTest: false}
+    }),
+    new IconLayer({
+      id: 'icon-layer',
+      data: kiosks,
+      pickable: true,
+      // iconAtlas and iconMapping are required
+      // getIcon: return a string
+      iconAtlas: '/static/assets/kiosk_clipart.png',
+      iconMapping: ICON_MAPPING,
+      getIcon: d => 'marker',
+
+      sizeScale: 5,
+      getPosition: d => d.coordinates,
+      getSize: d => 5,
+      sizeMinPixels: 20,
+      sizeMaxPixels: 200,
+      parameters: {depthTest: false}
+    }),
+    new TextLayer({
+      id: 'vehicle-passenger-counts',
+      data: kiosk_metrics[(time-(time%TIME_STEP)).toString()],
+      pickable: false,
+      fontFamily: 'monospace, Material Icons',
+      characterSet: ['\ue559', '\ue7fd', '\uf233', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '\n'],
+      getPosition: d => d.c,
+      getText: d => d.n + '\n' + d.v.toLocaleString() + '\ue559 ' + d.p.toLocaleString() + '\ue7fd ' + d.g.toLocaleString() + '\uf233',
+      getSize: 10,
+      getAngle: 0,
+      getTextAnchor: 'middle',
+      getAlignmentBaseline: 'top',
+      parameters: {depthTest: false}
+    }),
     new TripsLayer({
       id: 'trips',
       data: trips,
@@ -133,7 +215,7 @@ function App({
       shadowEnabled: false,
       // Enable picking
       pickable: true
-    }),
+    })
   ];
 
   return (
@@ -154,11 +236,10 @@ function App({
               else {
                 result = copyArray.concat(parseInt($(id_str).val()));
               }
-              console.log(result);
               setOccupancyHideArray(result);
             }} />
                 <label for="zeroPax">
-                  <span style={{background: '#FF0000'}}></span>Zero Passengers
+                  <span style={{background: 'rgb(255, 0, 0)'}}></span>Zero Passengers
                 </label>
             </li>
             <li>
@@ -172,11 +253,10 @@ function App({
               else {
                 result = copyArray.concat(parseInt($(id_str).val()));
               }
-              console.log(result);
               setOccupancyHideArray(result);
             }} />
                 <label for="onePax">
-                  <span style={{background: '#FCBA03'}}></span>One Passenger
+                  <span style={{background: 'rgb(230, 140, 0)'}}></span>One Passenger
                 </label>
             </li>
             <li>
@@ -190,11 +270,10 @@ function App({
               else {
                 result = copyArray.concat(parseInt($(id_str).val()));
               }
-              console.log(result);
               setOccupancyHideArray(result);
             }} />
                 <label for="twoPax">
-                  <span style={{background: '#00008B'}}></span>Two Passengers
+                  <span style={{background: 'rgb(200, 200, 0)'}}></span>Two Passengers
                 </label>
             </li>
             <li>
@@ -208,11 +287,10 @@ function App({
               else {
                 result = copyArray.concat(parseInt($(id_str).val()));
               }
-              console.log(result);
               setOccupancyHideArray(result);
             }} />
                 <label for="threePax">
-                  <span style={{background: '#90EE90'}}></span>Three Passengers
+                  <span style={{background: 'rgb(60, 200, 0)'}}></span>Three Passengers
                 </label>
             </li>
             <li>
@@ -226,11 +304,10 @@ function App({
               else {
                 result = copyArray.concat(parseInt($(id_str).val()));
               }
-              console.log(result);
               setOccupancyHideArray(result);
             }} />
                 <label for="fourPax">
-                  <span style={{background: '#006400'}}></span>Four Passengers
+                  <span style={{background: 'rgb(0, 100, 0)'}}></span>Four Passengers
                 </label>
             </li>
           </ul>
@@ -267,6 +344,7 @@ function App({
       effects={theme.effects}
       initialViewState={initialViewState}
       controller={true}
+      getTooltip={({object}) => object && `${object.msg}`}
     >
       <StaticMap reuseMaps mapStyle={mapStyle} preventStyleDiffing={true} />
     </DeckGL>

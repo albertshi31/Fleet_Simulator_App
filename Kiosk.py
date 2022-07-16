@@ -1,6 +1,7 @@
 class Kiosk:
-    def __init__(self, name, lat, lng, xcoord, ycoord):
+    def __init__(self, id, name, lat, lng, xcoord, ycoord):
         # Initialization Data
+        self.id = id
         self.name = name
         self.lat = lat
         self.lng = lng
@@ -28,8 +29,17 @@ class Kiosk:
                     .format(self.name, self.lat, self.lng, self.lst_passenger_objects, self.lst_vehicle_objects, self.lst_tuples_of_incoming_vehicle_objects_and_arrival_times, self.dict_lst_lsts_passenger_groupings, self.lst_all_arriving_passengers)
         return ret_str
 
+    def getName(self):
+        return self.name
+
+    def getID(self):
+        return self.id
+
     def getLatLng(self):
         return (self.lat, self.lng)
+
+    def getLngLatList(self):
+        return [self.lng, self.lat]
 
     def getXYPixelCoords(self):
         return (self.xcoord, self.ycoord)
@@ -51,6 +61,12 @@ class Kiosk:
     def getVehicles(self):
         return self.lst_vehicle_objects
 
+    # Returns list of all incoming vehicles
+    def getIncomingVehicles(self):
+        if self.lst_tuples_of_incoming_vehicle_objects_and_arrival_times:
+            return [x[0] for x in self.lst_tuples_of_incoming_vehicle_objects_and_arrival_times]
+        return []
+
     def addDepartingPassenger(self, passenger_object):
         self.lst_passenger_objects.append(passenger_object)
         self.lst_all_departing_passengers.append(passenger_object)
@@ -58,9 +74,10 @@ class Kiosk:
     def removeDepartingPassenger(self, passenger_object):
         self.lst_passenger_objects.remove(passenger_object)
 
-    def removeDepartingPassengers(self, passenger_group):
+    def removeDepartingPassengers(self, passenger_group, curr_time_in_sec):
         for pax in passenger_group:
             self.lst_passenger_objects.remove(pax)
+            pax.setServed(curr_time_in_sec)
         key = min(passenger_group, key=lambda pax: pax.odeparturetime).odeparturetime
         self.dict_lst_lsts_passenger_groupings[key].remove(passenger_group)
 
@@ -139,6 +156,7 @@ class Kiosk:
                 break
         for pax in ret_lst_missed_passengers:
             self.lst_passenger_objects.remove(pax)
+            pax.setMissed(curr_time_in_sec)
         self.lst_missed_passenger_objects.extend(ret_lst_missed_passengers)
         return ret_lst_missed_passengers
 

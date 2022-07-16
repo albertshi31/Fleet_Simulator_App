@@ -2,8 +2,9 @@ import numpy as np
 import math
 
 class Vehicle:
-    def __init__(self, lat=None, lng=None, MAX_CAPACITY=4, kiosk=None):
+    def __init__(self, id=None, lat=None, lng=None, MAX_CAPACITY=4, kiosk=None):
         # Initialization variables
+        self.id = id
         self.lat = lat
         self.lng = lng
         self.kiosk = kiosk
@@ -23,8 +24,15 @@ class Vehicle:
         self.enroute = False
 
         # Animation data
-        self.popup_content = {}
         self.trips = []
+
+        # EOD data
+        self.all_passengers_served = []
+        self.total_distance_traveled = 0
+        self.total_empty_distance_traveled = 0
+        self.departure_vehicle_occupancy = []
+        self.total_duration_traveled = 0
+        self.total_empty_duration_traveled = 0
 
     def __str__(self):
         return "Location: ({},{})\nCurrent Kiosk: {}\nNumber of passengers: {}\nDestinations:{}\n"\
@@ -61,6 +69,11 @@ class Vehicle:
         return self.kiosk
 
     def removeTripLeg(self):
+        self.total_distance_traveled += self.lst_leg_distances[0]
+        self.total_duration_traveled += self.lst_leg_durations[0]
+        if self.num_passengers == 0:
+            self.total_empty_distance_traveled += self.lst_leg_distances[0]
+            self.total_empty_duration_traveled += self.lst_leg_durations[0]
         self.curr_trip.pop(0)
         self.lst_arrival_times_by_kiosk.pop(0)
         self.trip_duration -= self.lst_leg_durations.pop(0)
@@ -90,19 +103,18 @@ class Vehicle:
 
     def depart(self, curr_time_in_sec):
         self.enroute = True
-        self.popup_content[curr_time_in_sec] = {
+        self.departure_vehicle_occupancy.append(self.num_passengers)
+        self.trips.append({
+            "id": self.id,
             "num_passengers": self.num_passengers,
+            "lnglats": [[lng, lat] for lat, lng in self.lst_leg_latlngs[0]],
+            "timestamps": self.lst_leg_timestamps[0],
             "passengers": [str(pax) for pax in self.lst_passengers],
             "destinations": [str(kiosk) for kiosk in self.curr_trip],
             "trip_duration": self.trip_duration,
             "trip_distance": self.trip_distance,
             "lst_leg_latlngs": self.lst_leg_latlngs,
             "lst_leg_durations": self.lst_leg_durations
-        }
-        self.trips.append({
-            "num_passengers": self.num_passengers,
-            "lnglats": [[lng, lat] for lat, lng in self.lst_leg_latlngs[0]],
-            "timestamps": self.lst_leg_timestamps[0]
         })
 
 
@@ -127,6 +139,28 @@ class Vehicle:
         for pax in lst_passenger_objects:
             self.lst_passengers.remove(pax)
         self.num_passengers -= len(lst_passenger_objects)
+        self.all_passengers_served.extend(lst_passenger_objects)
+
+    def getPassengers(self):
+        return self.lst_passengers
 
     def getTrips(self):
         return self.trips
+
+    def getDVO(self):
+        return self.departure_vehicle_occupancy
+
+    def getTotalDistanceTraveled(self):
+        return self.total_distance_traveled
+
+    def getTotalEmptyDistanceTraveled(self):
+        return self.total_empty_distance_traveled
+
+    def setID(self, id):
+        self.ID = id
+
+    def getTotalDurationTraveled(self):
+        return self.total_duration_traveled
+
+    def getTotalEmptyDurationTraveled(self):
+        return self.total_empty_duration_traveled

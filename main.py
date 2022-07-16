@@ -22,7 +22,7 @@ from Dispatcher import Dispatcher
 from Passenger import Passenger
 from Kiosk import Kiosk
 
-from helper_functions import create_pixel_grid, latlng_to_xypixel, xypixel_to_latlng
+from helper_functions import create_pixel_grid, latlng_to_xypixel, xypixel_to_latlng, get_locations_precalculated_kiosks
 import pandas as pd
 
 global THIS_FOLDER
@@ -200,15 +200,18 @@ def getRouteMeta(latlng1, latlng2):
     #
     # return route_latlngs, route_distance, route_duration, route_timestamps
 
-def getNearestStreetCoordinate(latlng1):
-    loc = "{},{}".format(latlng1[1], latlng1[0])
+@app.route("/get_nearest_coordinates")
+def getNearestStreetCoordinate():
+    lat = float(request.args.get("lat"))
+    lng = float(request.args.get("lng"))
+    loc = "{},{}".format(lng, lat)
     url = "http://127.0.0.1:5000/nearest/v1/driving/"
     r = requests.get(url + loc)
     if r.status_code != 200:
         return {}
     res = r.json()
-    print(res)
-    return "SUCCESS"
+    lng, lat = res['waypoints'][0]['location']
+    return { "lat": lat, "lng": lng }
 
 @app.route("/get_route", methods=['POST'])
 def get_route():
@@ -220,7 +223,6 @@ def get_route():
     for latlng1 in lst_latlngs:
         for latlng2 in lst_latlngs:
             key = str([(latlng1[0], latlng1[1]), (latlng2[0], latlng2[1])])
-            print(key)
             route_latlngs, route_distance, route_duration, route_timestamps = getRouteMeta(latlng1, latlng2)
             route_matrix[key] = {
                 'key': key,
@@ -308,7 +310,7 @@ def get_geocoded_address():
     URL = "http://localhost:8080/search.php"
 
     # defining a params dict for the parameters to be sent to the API
-    PARAMS = {'q': address + " Neptune, NJ"}
+    PARAMS = {'q': address}
 
     # sending get request and saving the response as response object
     r = requests.get(url = URL, params = PARAMS)
@@ -336,17 +338,15 @@ def get_geocoded_address():
 
 @app.route("/draw_precalculated_kiosks")
 def draw_precalculated_kiosks():
-    lst_marker_latlngs = []
-    global person_trip_lst_latlngs_by_h3_index
-    for key, lst_latlngs in person_trip_lst_latlngs_by_h3_index.items():
-        average_lat = 0
-        average_lng = 0
-        for lat, lng in lst_latlngs:
-            average_lat += lat
-            average_lng += lng
-        average_lat /= len(lst_latlngs)
-        average_lng /= len(lst_latlngs)
-        lst_marker_latlngs.append([average_lat, average_lng])
+    north_lat = float(request.args.get("north"))
+    south_lat = float(request.args.get("south"))
+    east_lng = float(request.args.get("east"))
+    west_lng = float(request.args.get("west"))
+    feature_geojson_url_path = request.args.get("feature_geojson_url_path")
+
+    global person_trip_lst_latlngs
+    lst_marker_latlngs = get_locations_precalculated_kiosks(north_lat, south_lat, east_lng, west_lng, feature_geojson_url_path, person_trip_lst_latlngs)
+
     return { "lst_marker_latlngs": lst_marker_latlngs }
 
 @app.route("/save_ODD", methods=['POST'])
@@ -451,30 +451,33 @@ def getCompleteRoutesMatrix(lst_latlngs, routes_dict):
 def prepare_simulation():
     received_data = request.get_json()
 
-    CITY_NAME = received_data['city_name']
-    county_name = received_data['county_name']
-    state_name = received_data['state_name']
-    center_lng_lat = received_data['center_lng_lat']
-    lst_latlngs = received_data['lst_marker_latlngs']
+    # CITY_NAME = received_data['city_name']
+    # county_name = received_data['county_name']
+    # state_name = received_data['state_name']
+    center_coordinates = received_data['center_coordinates']
+    kiosks_dict = received_data['kiosks_dict']
     routes_dict = received_data['routes_dict']
-    fleetsize = int(received_data['fleetsize'][0])
+    fleetsize = int(received_data['fleetsize'])
     modesplit = float(received_data['modesplit']) / 100
     pax_waittime_threshold = int(received_data['pax_waittime_threshold'])
     max_circuity = float(received_data['max_circuity']) / 100
-    MAX_CAPACITY = 4
+    MAX_CAPACITY = int(received_data['max_capacity'])
+    polylinesGeoJSON = received_data['polylinesGeoJSON']
     TIME_STEP = 1
+
     lst_vehicle = []
-
-    print(CITY_NAME, county_name, state_name, center_lng_lat, lst_latlngs)
-    print(routes_dict)
-
     lst_kiosk_pixels = []
     lst_kiosk = []
-    for idx, latlng in enumerate(lst_latlngs):
-        name, lat, lng = idx, latlng[0], latlng[1]
+    lst_kiosk_dict_animation = []
+    kiosk_id = 1
+    for key, value in kiosks_dict.items():
+        name, category, lat, lng = value['name'], value['category'], value['lat'], value['lng']
         xpixel, ypixel = latlng_to_xypixel(lat, lng)
         lst_kiosk_pixels.append((xpixel, ypixel))
-        lst_kiosk.append(Kiosk(name, lat, lng, xpixel, ypixel))
+        new_kiosk = Kiosk(kiosk_id, name, lat, lng, xpixel, ypixel)
+        lst_kiosk.append(new_kiosk)
+        lst_kiosk_dict_animation.append({'coordinates': [lng, lat], 'msg': str(new_kiosk)})
+        kiosk_id += 1
 
     lst_all_passengers = []
     for filename in list_of_unzipped_files:
@@ -488,8 +491,31 @@ def prepare_simulation():
     # get the start datetime
     start_time = time.time()
 
+    # Create Dispatcher object
     dispatcher = Dispatcher(lst_all_passengers, lst_kiosk, lst_vehicle, pax_waittime_threshold, routes_dict, fleetsize, MAX_CAPACITY, TIME_STEP)
+
+    # Run the simulation
     dispatcher.runSimulation()
+
+    # Save the simulation output into animtion data file
+    EOD_metrics = dispatcher.getEODMetrics()
+    timeframe_metrics = dispatcher.getTimeframeMetrics()
+    trips = dispatcher.getAnimationTrips()
+    kiosk_metrics = dispatcher.getKioskTimeframeMetrics()
+
+    animation_data_file_dict = {
+        "center_coordinates": center_coordinates,
+        "TIME_STEP": TIME_STEP,
+        "EOD_metrics": EOD_metrics,
+        "timeframe_metrics": timeframe_metrics,
+        "trips": trips,
+        "kiosks": lst_kiosk_dict_animation,
+        "kiosk_metrics": kiosk_metrics,
+        "road_network": polylinesGeoJSON
+    }
+
+    with open("AnimationDataFile.json", "w") as f:
+        json.dump(animation_data_file_dict, f)
 
     # get execution time
     runtime=time.time()-start_time
@@ -499,7 +525,35 @@ def prepare_simulation():
     }
     return response
 
-def saveCreateAnimationDict(create_animation_dict):
+@app.route("/animation")
+def animation():
+    with open("AnimationDataFile.json", "r") as f:
+        animation_data_file_dict = json.load(f)
+
+    # Retrieve all values from the data file
+    center_coordinates = animation_data_file_dict['center_coordinates']
+    TIME_STEP = animation_data_file_dict['TIME_STEP']
+    trips = animation_data_file_dict['trips']
+    EOD_metrics = animation_data_file_dict['EOD_metrics']
+    timeframe_metrics = animation_data_file_dict['timeframe_metrics']
+    kiosks = animation_data_file_dict['kiosks']
+    kiosk_metrics = animation_data_file_dict['kiosk_metrics']
+    road_network = animation_data_file_dict['road_network']
+
+    html = render_template("index.html",
+                            center_coordinates=center_coordinates,
+                            time_step=TIME_STEP,
+                            trips=trips,
+                            kiosks=kiosks,
+                            kiosk_metrics = kiosk_metrics,
+                            road_network = road_network,
+                            EOD_metrics = EOD_metrics,
+                            timeframe_metrics = timeframe_metrics)
+    response = make_response(html)
+    return response
+
+
+def saveAnimationData(create_animation_dict):
     city_name = create_animation_dict['CITY_NAME']
     with open("static/" + city_name + "/createanimationdict.json", "w") as f:
         json.dump(create_animation_dict, f)
@@ -605,14 +659,6 @@ def create_animation(CITY_NAME):
     }
     return response
 
-@app.route("/animation")
-def my_index():
-    with open("trips.json", "r") as f:
-        trips = json.load(f)
-
-    html = render_template("index.html", trips=trips)
-    response = make_response(html)
-    return response
 
 
 @app.route("/graphs")

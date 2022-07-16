@@ -14,6 +14,12 @@ class Dispatcher:
         self.MAX_CAPACITY = MAX_CAPACITY
         self.TIME_STEP = TIME_STEP
 
+        # Metrics
+        self.timeframe_metrics = {}
+        self.EOD_metrics = {}
+        self.animation_trips = []
+        self.kiosk_timeframe_metrics = {}
+
     ############################################################################
     # ASSIGNING PASSENGERS TO KIOSKS FUNCTIONS #
 
@@ -198,19 +204,139 @@ class Dispatcher:
 
     ############################################################################
 
-    # Save files used for animation
-    def saveAnimationTripsAndMetrics(self):
-        avo = []
+    # Save trips used in the animation TripsLayer
+    def saveAnimationTrips(self):
         lst_trips = []
         for vehicle in self.lst_all_vehicle_objects:
             lst_trips.extend(vehicle.getTrips())
-            for trip in vehicle.getTrips():
-                avo.append(trip["num_passengers"])
-        print(avo)
-        print("AVO:", sum(avo)/len(lst_trips))
-        with open("trips.json", "w") as f:
-            json.dump(lst_trips, f)
-        return
+
+        self.animation_trips = lst_trips
+
+    # Save metrics calculated at EOD
+    def saveEODMetrics(self):
+        total_vehicle_distance_traveled_meters = 0
+        total_empty_vehicle_distance_traveled_meters = 0
+        lst_vehicle_distance_traveled = []
+        dvo = []
+        utilization_time = []
+        for vehicle in self.lst_all_vehicle_objects:
+            dvo.extend(vehicle.getDVO())
+            total_vehicle_distance_traveled_meters += vehicle.getTotalDistanceTraveled()
+            lst_vehicle_distance_traveled.append(vehicle.getTotalDistanceTraveled())
+            total_empty_vehicle_distance_traveled_meters += vehicle.getTotalEmptyDistanceTraveled()
+            utilization_time.append(vehicle.getTotalDurationTraveled() - vehicle.getTotalEmptyDurationTraveled())
+
+        total_vehicle_distance_traveled_miles = total_vehicle_distance_traveled_meters*0.000621371192
+        total_empty_vehicle_distance_traveled_miles = total_empty_vehicle_distance_traveled_meters * 0.000621371192
+
+        self.EOD_metrics["total_vehicle_distance_traveled"] = total_vehicle_distance_traveled_miles
+        self.EOD_metrics["total_empty_vehicle_distance_traveled"] = total_empty_vehicle_distance_traveled_miles
+        self.EOD_metrics["lst_vehicle_distance_traveled"] = lst_vehicle_distance_traveled
+        self.EOD_metrics["dvo"] = dvo
+        self.EOD_metrics["avg_utilization_time"] = sum(utilization_time) / (len(utilization_time)*3600)
+
+        person_alone_trip_length = []
+        pax_waittime = []
+        walk_to_okiosk_dist = []
+        walk_to_dkiosk_dist = []
+        pax_added_triptime = []
+        for pax in self.lst_all_passenger_objects:
+            if not pax.isMissed():
+                person_alone_trip_length.append(pax.getAloneTripLength())
+                pax_waittime.append(pax.getWaittime())
+                walk_to_okiosk_dist.append(pax.getWalkToKioskDistance())
+                walk_to_dkiosk_dist.append(pax.getWalkToDestKioskDistance())
+                pax_added_triptime.append(pax.getAddedTriptime())
+
+        self.EOD_metrics["person_alone_trip_length"] = person_alone_trip_length
+        self.EOD_metrics["pax_waittime"] = pax_waittime
+        self.EOD_metrics["avg_pax_waittime_minutes"] = sum(pax_waittime) / (len(pax_waittime) * 60)
+        self.EOD_metrics["pax_added_triptime"] = pax_added_triptime
+        self.EOD_metrics["avg_pax_added_triptime"] = sum(pax_added_triptime) / len(pax_added_triptime)
+        self.EOD_metrics["walk_to_okiosk_dist"] = walk_to_okiosk_dist
+        self.EOD_metrics["walk_to_dkiosk_dist"] = walk_to_dkiosk_dist
+
+        # AVO is lower because the numerator is alone trip length instead of person miles traveled
+        avo = sum(person_alone_trip_length) / total_vehicle_distance_traveled_meters
+        self.EOD_metrics["avo"] = avo
+
+        total_num_vehicles = len(self.lst_all_vehicle_objects)
+        print("Total vehicle number:", total_num_vehicles)
+        num_total_passengers = 0
+        num_served_passengers = 0
+        num_missed_passengers = 0
+        for kiosk in self.lst_all_kiosk_objects:
+            num_total_passengers += len(kiosk.lst_all_arriving_passengers)
+            num_served_passengers += len(kiosk.lst_all_arriving_passengers)
+            num_total_passengers += len(kiosk.lst_missed_passenger_objects)
+            num_missed_passengers += len(kiosk.lst_missed_passenger_objects)
+        print("Total passengers served:", num_served_passengers)
+        print("Missed passengers:", num_missed_passengers)
+        print("AVO:", avo)
+        print("DVO:", sum(dvo)/len(dvo))
+        print("Avg utilization time:",self.EOD_metrics["avg_utilization_time"])
+        assert num_total_passengers == len(self.lst_all_passenger_objects), "Some passengers are unaccounted for"
+        assert len(person_alone_trip_length) == num_served_passengers, "Some served passengers are unaccounted for"
+
+        self.EOD_metrics["total_num_vehicles"] = total_num_vehicles
+        self.EOD_metrics["num_total_passengers"] = num_total_passengers
+        self.EOD_metrics["num_served_passengers"] = num_served_passengers
+        self.EOD_metrics["num_missed_passengers"] = num_missed_passengers
+
+
+    # Save metrics calculaged in current timestep
+    def saveCurrentTimeframeMetrics(self, curr_time_in_sec):
+        vehicles_moving = 0
+        vehicles_with_pax_moving = 0
+        empty_vehicles_moving = 0
+        vehicles_not_moving = 0
+        pax_moving = 0
+        for vehicle in self.lst_all_vehicle_objects:
+            if vehicle.isEnRoute():
+                vehicles_moving += 1
+                if len(vehicle.getPassengers()) > 0:
+                    vehicles_with_pax_moving += 1
+                    pax_moving += len(vehicle.getPassengers())
+                else:
+                    empty_vehicles_moving += 1
+            else:
+                vehicles_not_moving += 1
+
+        pax_waiting = 0
+        pax_arrived_running_total = 0
+        pax_missed_running_total = 0
+        for kiosk in self.lst_all_kiosk_objects:
+            pax_waiting += len(kiosk.getPassengerObjects())
+            pax_arrived_running_total += len(kiosk.getArrivedPassengers())
+            pax_missed_running_total += len(kiosk.getMissedPassengers())
+            new_kiosk_timeframe_entry = {
+                "c": kiosk.getLngLatList(),
+                "n": kiosk.getID(),
+                "v": len(kiosk.getVehicles()),
+                "p": len(kiosk.getPassengerObjects()),
+                "g": kiosk.getNumPassengerGroupings()
+            }
+            if curr_time_in_sec in self.kiosk_timeframe_metrics:
+                self.kiosk_timeframe_metrics[curr_time_in_sec].append(new_kiosk_timeframe_entry)
+            else:
+                self.kiosk_timeframe_metrics[curr_time_in_sec] = [new_kiosk_timeframe_entry]
+
+        total_pax = pax_moving + pax_waiting
+
+        assert vehicles_moving + vehicles_not_moving == len(self.lst_all_vehicle_objects), "Some vehicles are missing in the count"
+        timeframe_metric_entry = {
+            "vehicles_moving": vehicles_moving,
+            "vehicles_with_pax_moving": vehicles_with_pax_moving,
+            "empty_vehicles_moving": empty_vehicles_moving,
+            "vehicles_not_moving": vehicles_not_moving,
+            "total_pax": total_pax,
+            "pax_moving": pax_moving,
+            "pax_waiting": pax_waiting,
+            "pax_served_running_total": pax_arrived_running_total,
+            "pax_missed_running_total": pax_missed_running_total
+        }
+        self.timeframe_metrics[curr_time_in_sec] = timeframe_metric_entry
+
 
     ############################################################################
 
@@ -253,14 +379,14 @@ class Dispatcher:
                     new_kiosk = vehicle.updateKiosk()
                     #print("Vehicle arriving with ",
                           #[pax for pax in vehicle.lst_passengers if vehicle.kiosk == pax.dest_kiosk]," to ",vehicle.kiosk.name)
+                    # Remove the last vehicle trip since it is completed
+                    vehicle.removeTripLeg()
                     # Get the passengers that the vehicle is dropping off at this new kiosk
                     lst_dropped_off_passengers = vehicle.getDroppedOffPassengers()
                     # Remove dropped off passengers from the vehicle passenger list
                     vehicle.removePassengers(lst_dropped_off_passengers)
                     # Add dropped off passengers as arriving passengers to the new kiosk (used for tracking purposes)
                     new_kiosk.addArrivingPassengers(lst_dropped_off_passengers)
-                    # Remove the last vehicle trip since it is completed
-                    vehicle.removeTripLeg()
                     # Allow the vehicle to begin accepting trips again (no longer enroute)
                     vehicle.arrive()
 
@@ -312,7 +438,8 @@ class Dispatcher:
 
                 # Set the Passenger alone travel time (if they went straight to their kiosk)
                 # and their max travel time (max additional time they are willing to spend traveling)
-                pax.setAloneAndMaxTravelTimes(self.kiosk_to_kiosk_route_matrix[str([pax.kiosk.getLatLng(), pax.dest_kiosk.getLatLng()])]['duration'])
+                pax.setTripInfo(self.kiosk_to_kiosk_route_matrix[str([pax.kiosk.getLatLng(), pax.dest_kiosk.getLatLng()])]['duration'],
+                                self.kiosk_to_kiosk_route_matrix[str([pax.kiosk.getLatLng(), pax.dest_kiosk.getLatLng()])]['distance'])
 
             # Iterate through kiosks and assign waiting passengers to vehicles
             for kiosk in self.lst_all_kiosk_objects:
@@ -358,7 +485,7 @@ class Dispatcher:
                     for i in range(num_vehicles_to_generate):
                         if len(self.lst_all_vehicle_objects) >= self.MAX_VEHICLES:
                             break
-                        new_vehicle = Vehicle(kiosk.lat, kiosk.lng, self.MAX_CAPACITY, kiosk)
+                        new_vehicle = Vehicle(len(self.lst_all_vehicle_objects)+1, kiosk.lat, kiosk.lng, self.MAX_CAPACITY, kiosk)
                         kiosk.addVehicle(new_vehicle)
                         self.lst_all_vehicle_objects.append(new_vehicle)
                         #print("Vehicle created at ",kiosk.name)
@@ -377,7 +504,7 @@ class Dispatcher:
                     #print("Vehicle departing with ", passenger_grouping)
                     #print()
                     # Remove passengers from kiosk since they left in the vehicle
-                    kiosk.removeDepartingPassengers(passenger_grouping)
+                    kiosk.removeDepartingPassengers(passenger_grouping, curr_time_in_sec)
                     # Remove the vehicle from the kiosk
                     kiosk.removeVehicle(vehicle)
 
@@ -439,8 +566,7 @@ class Dispatcher:
                         closest_kiosk_with_excess_vehicles, kiosk_in_need, self.kiosk_to_kiosk_route_matrix,
                         curr_time_in_sec)
                     assert len(passengers) == 0, "There should be no passengers in this empty trip"
-                    kiosk_in_need, arrival_time = curr_trip[
-                                                      -1], curr_time_in_sec + trip_duration  # Get arrival time of vehicle to kiosk in need
+                    kiosk_in_need, arrival_time = curr_trip[-1], curr_time_in_sec + trip_duration  # Get arrival time of vehicle to kiosk in need
                     if (arrival_time > min(
                             kiosk_in_need.getPassengerGroupings().keys()) + self.passenger_waittime_threshold):
                         break
@@ -466,21 +592,29 @@ class Dispatcher:
                             kiosk_in_need.updateNetVehicleBalance(self.passenger_waittime_threshold) # Update kiosk in need net vehicle balance
                     lst_kiosks_with_excess_vehicles.remove(closest_kiosk_with_excess_vehicles)
 
+            # Save current timeframe metrics
+            self.saveCurrentTimeframeMetrics(curr_time_in_sec)
+
             # Iterate time by time step
             curr_time_in_sec += self.TIME_STEP
 
-        self.saveAnimationTripsAndMetrics()
+        # Save EOD metrics
+        self.saveEODMetrics()
 
-        print()
-        print("Total vehicle number: ",len(self.lst_all_vehicle_objects))
-        num_total_passengers = 0
-        served_passengers = 0
-        missed_passengers = 0
-        for kiosk in self.lst_all_kiosk_objects:
-            num_total_passengers += len(kiosk.lst_all_arriving_passengers)
-            served_passengers += len(kiosk.lst_all_arriving_passengers)
-            num_total_passengers += len(kiosk.lst_missed_passenger_objects)
-            missed_passengers += len(kiosk.lst_missed_passenger_objects)
-        print("Total passengers served:", served_passengers)
-        print("Missed passengers:", missed_passengers)
-        assert num_total_passengers == len(self.lst_all_passenger_objects), "Some passengers are unaccounted for"
+        # Save trips used in animation
+        self.saveAnimationTrips()
+
+    # Get EOD Metrics
+    def getEODMetrics(self):
+        return self.EOD_metrics
+
+    # Get animation trips
+    def getAnimationTrips(self):
+        return self.animation_trips
+
+    # Get timeframe metrics
+    def getTimeframeMetrics(self):
+        return self.timeframe_metrics
+
+    def getKioskTimeframeMetrics(self):
+        return self.kiosk_timeframe_metrics
