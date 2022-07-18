@@ -149,7 +149,7 @@ def getTimestamps(lst_route_leg_maneuvers, route_duration, len_route_latlngs):
 
 def getRouteMeta(latlng1, latlng2):
     loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
-    url = "http://127.0.0.1:5000/route/v1/driving/"
+    url = "http://52.45.178.80/route/v1/driving/"
     r = requests.get(url + loc + "?overview=full&annotations=true&exclude=motorway")
     res = r.json()
     raw_timestamps = res['routes'][0]['legs'][0]['annotation']['duration']
@@ -205,13 +205,14 @@ def getNearestStreetCoordinate():
     lat = float(request.args.get("lat"))
     lng = float(request.args.get("lng"))
     loc = "{},{}".format(lng, lat)
-    url = "http://127.0.0.1:5000/nearest/v1/driving/"
+    url = "http://52.45.178.80/nearest/v1/driving/"
     r = requests.get(url + loc)
     if r.status_code != 200:
         return {}
     res = r.json()
     lng, lat = res['waypoints'][0]['location']
-    return { "lat": lat, "lng": lng }
+    name = res['waypoints'][0]['name']
+    return { "lat": lat, "lng": lng, "name": name }
 
 @app.route("/get_route", methods=['POST'])
 def get_route():
@@ -463,7 +464,7 @@ def prepare_simulation():
     max_circuity = float(received_data['max_circuity']) / 100
     MAX_CAPACITY = int(received_data['max_capacity'])
     polylinesGeoJSON = received_data['polylinesGeoJSON']
-    TIME_STEP = 1
+    TIME_STEP = 10
 
     lst_vehicle = []
     lst_kiosk_pixels = []

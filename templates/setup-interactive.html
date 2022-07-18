@@ -529,7 +529,8 @@
           success: function(response) {
             marker_lat = response["lat"];
             marker_lng = response["lng"];
-            callback(marker_lat, marker_lng);
+            name = response["name"];
+            callback(marker_lat, marker_lng, name);
           }
         }
       );
@@ -537,13 +538,18 @@
 
     var markerLayerGroup = L.layerGroup().addTo(mymap);
     var circleLayerGroup = L.layerGroup().addTo(mymap);
-    function placeKiosk(name, category, lat, lng) {
+    function placeKiosk(input_name, category, lat, lng) {
       $('#routenetwork').show();
       // Route Network is not up to date, must first connect kiosks before running simulation
       $('#simulate_trips_button').prop('disabled', true);
 
-      getNearestCoord(lat, lng, function(lat, lng) {
-        placeMarkerOnMap(name, category, lat, lng);
+      getNearestCoord(lat, lng, function(lat, lng, name) {
+        if (input_name == false) {
+          placeMarkerOnMap(name, category, lat, lng);
+        }
+        else {
+          placeMarkerOnMap(input_name, category, lat, lng);
+        }
       });
 
     };
@@ -855,7 +861,7 @@
       var arrayLength = response["lst_marker_latlngs"].length;
       for (var i = 0; i < arrayLength; i++) {
         latlng = response["lst_marker_latlngs"][i];
-        placeKiosk(i.toString(), "unknown", latlng[0], latlng[1]);
+        placeKiosk(false, "unknown", latlng[0], latlng[1]);
       }
     }
 
