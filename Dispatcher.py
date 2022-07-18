@@ -592,6 +592,85 @@ class Dispatcher:
                             kiosk_in_need.updateNetVehicleBalance(self.passenger_waittime_threshold) # Update kiosk in need net vehicle balance
                     lst_kiosks_with_excess_vehicles.remove(closest_kiosk_with_excess_vehicles)
 
+            lst_kiosks_with_low_num_vehicles = []
+            lst_kiosks_with_too_many_vehicles = []
+            for kiosk in self.lst_all_kiosk_objects:
+                # Find all kiosks in need of a vehicle
+                if kiosk.getTotalVehicleBalance() <= 2:
+                        lst_kiosks_with_low_num_vehicles.append(kiosk)
+                # Find all kiosks with excess vehicles that are not currently needed by kiosk
+                if kiosk.getNetVehicleBalance() >= 4:
+                    lst_kiosks_with_too_many_vehicles.append(kiosk)
+
+            # print("######################################")
+            # print(lst_kiosks_in_need_of_vehicle, lst_kiosks_with_excess_vehicles)
+            # Match kiosks in need of a vehicle to kiosks with excess vehicles, based on distance
+
+            for kiosk_with_excess in lst_kiosks_with_too_many_vehicles:
+                # Edge case: If lst_kiosks_with_low_num is empty, just break the for loop
+                if len(lst_kiosks_with_low_num_vehicles) == 0:
+                    break
+
+                # Send all the vehicles that this kiosk needs
+                # Keep giving this needy kiosk vehicles until its net vehicle balance becomes 0
+                while kiosk_with_excess.getNetVehicleBalance() > 1:
+                    if (len(kiosk_with_excess.getAllPassengerGroups()) != 0):
+                        for vehicle, passenger_grouping in list(
+                                zip(kiosk_with_excess.getVehicles(),kiosk_with_excess.getAllPassengerGroups())):
+                            passengers, curr_trip, num_passengers, trip_duration, trip_distance, lst_leg_durations, lst_leg_distances, lst_leg_latlngs, lst_leg_timestamps = self.create_vehicle_with_passengers_route(
+                                kiosk_with_excess, passenger_grouping, self.kiosk_to_kiosk_route_matrix, curr_time_in_sec)
+                            # Set the route of the vehicle
+                            vehicle.addTripLegs(passengers, curr_trip, num_passengers, trip_duration, trip_distance,
+                                                lst_leg_durations, lst_leg_distances, lst_leg_latlngs, lst_leg_timestamps,
+                                                curr_time_in_sec)
+                            # Depart vehicle
+                            vehicle.depart(curr_time_in_sec)
+                            kiosk_with_excess.removeVehicle(vehicle)
+                            kiosk_with_excess.removeDepartingPassengers(passenger_grouping, curr_time_in_sec)
+                            kiosk_with_excess.updateNetVehicleBalance(self.passenger_waittime_threshold)
+                            curr_trip[-1].addIncomingVehicle(vehicle,arrival_time)
+                            curr_trip[-1].updateNetVehicleBalance(self.passenger_waittime_threshold)
+                            if (kiosk_with_excess.getNetVehicleBalance() <= 1):
+                                break
+
+                    else:
+                        if (len(lst_kiosks_with_low_num_vehicles) == 0):
+                            break
+                        if (kiosk_with_excess.getNetVehicleBalance() <= 1):
+                            break
+                        closest_kiosk_needing_vehicles = self.getClosestKioskToKiosk(lst_kiosks_with_low_num_vehicles, kiosk_with_excess, self.kiosk_to_kiosk_route_matrix)
+
+                    # print(closest_kiosk_with_excess_vehicles)
+                    # Preplan route empty vehicle to kiosk in need
+                        passengers, curr_trip, num_passengers, trip_duration, trip_distance, lst_leg_durations, lst_leg_distances, lst_leg_latlngs, lst_leg_timestamps = self.create_empty_vehicle_route(
+                            kiosk_with_excess, closest_kiosk_needing_vehicles, self.kiosk_to_kiosk_route_matrix,
+                            curr_time_in_sec)
+                        assert len(passengers) == 0, "There should be no passengers in this empty trip"
+                        arrival_time = curr_time_in_sec + trip_duration  # Get arrival time of vehicle to kiosk in need
+                        # Start going through the vehicles of the closest kiosk
+                        for vehicle in kiosk_with_excess.getVehicles():  # It's possible for getVehicles() to return empty if there are incoming vehicles but no vehicles currently stationed at the kiosk, which makes the net_vehicle_balance for this kiosk positive
+                            # Two cases will case this loop to end:
+                            # 1. The closest kiosk might run out of vehicles (currently stationed at this kiosk), so the next closest kiosk must be found
+                            # 2. The kiosk in need no longer needs any more vehicles
+                            if kiosk_with_excess.getNetVehicleBalance() <= 1:
+                                break
+                            # Send vehicles from excess kiosk to kiosk in need
+                            else:
+                                vehicle.addTripLegs(passengers, curr_trip, num_passengers, trip_duration, trip_distance,
+                                                    lst_leg_durations, lst_leg_distances, lst_leg_latlngs,
+                                                    lst_leg_timestamps,
+                                                    curr_time_in_sec)  # Send empty vehicle to kiosk in need
+                                vehicle.depart(curr_time_in_sec)  # Depart vehicle
+                                kiosk_with_excess.removeVehicle(
+                                    vehicle)  # Remove vehicle from current vehicles stationed at closest kiosk
+                                kiosk_with_excess.updateNetVehicleBalance(
+                                    self.passenger_waittime_threshold)  # Update the net vehicle balance of closest kiosk - THIS MIGHT UPDATE TWICE
+                                closest_kiosk_needing_vehicles.addIncomingVehicle(vehicle,
+                                                                 arrival_time)  # Update list of incoming vehicles to kiosk in need
+                                closest_kiosk_needing_vehicles.updateNetVehicleBalance(
+                                    self.passenger_waittime_threshold)  # Update kiosk in need net vehicle balance
+                        lst_kiosks_with_low_num_vehicles.remove(closest_kiosk_needing_vehicles)
+
             # Save current timeframe metrics
             self.saveCurrentTimeframeMetrics(curr_time_in_sec)
 
