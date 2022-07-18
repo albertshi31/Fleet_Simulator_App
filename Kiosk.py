@@ -178,3 +178,17 @@ class Kiosk:
                         return_lst_of_lsts_of_passenger_groupings.append(lst_passenger_grouping)
 
         return return_lst_of_lsts_of_passenger_groupings
+
+    def getAllPassengerGroups(self):
+        return_lst_of_lsts_of_passenger_groupings = []
+        # Look at all passenger groups and see if any of their members waited equal to or more than the threshold
+        for key, lst_lsts_passenger_groupings in self.dict_lst_lsts_passenger_groupings.items():
+            return_lst_of_lsts_of_passenger_groupings.extend(lst_lsts_passenger_groupings)
+
+        return return_lst_of_lsts_of_passenger_groupings
+    def getTotalVehicleBalance(self):
+        # The number of vehicles the kiosk should request is the difference between the number of passenger groupings
+        # and the combination of (incoming vehicles that arrive before the first passenger group departs) and (vehicles it currently has at the kiosk)
+        num_incoming_vehicles = len(self.lst_tuples_of_incoming_vehicle_objects_and_arrival_times)
+        return (len(self.lst_vehicle_objects) + num_incoming_vehicles) - self.getNumPassengerGroupings()
+
