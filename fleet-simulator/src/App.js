@@ -120,7 +120,7 @@ function App({
   initialViewState = INITIAL_VIEW_STATE,
   mapStyle = MAP_STYLE,
   theme = DEFAULT_THEME,
-  loopLength = 86995, // unit corresponds to the timestamp in source data
+  loopLength = LOOP_LENGTH, // unit corresponds to the timestamp in source data
   startingAnimationSpeed = 1,
   startTime = 0
 }) {

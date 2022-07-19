@@ -149,7 +149,7 @@ def getTimestamps(lst_route_leg_maneuvers, route_duration, len_route_latlngs):
 
 def getRouteMeta(latlng1, latlng2):
     loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
-    url = "http://52.45.178.80/route/v1/driving/"
+    url = "http://localhost:5000/route/v1/driving/"
     r = requests.get(url + loc + "?overview=full&annotations=true&exclude=motorway")
     res = r.json()
     raw_timestamps = res['routes'][0]['legs'][0]['annotation']['duration']
@@ -205,7 +205,7 @@ def getNearestStreetCoordinate():
     lat = float(request.args.get("lat"))
     lng = float(request.args.get("lng"))
     loc = "{},{}".format(lng, lat)
-    url = "http://52.45.178.80/nearest/v1/driving/"
+    url = "http://localhost:5000/nearest/v1/driving/"
     r = requests.get(url + loc)
     if r.status_code != 200:
         return {}
@@ -452,6 +452,9 @@ def getCompleteRoutesMatrix(lst_latlngs, routes_dict):
 def prepare_simulation():
     received_data = request.get_json()
 
+    with open("InitSimTestData_Trenton.json", "w") as f:
+        json.dump(received_data, f)
+
     # CITY_NAME = received_data['city_name']
     # county_name = received_data['county_name']
     # state_name = received_data['state_name']
@@ -503,6 +506,7 @@ def prepare_simulation():
     timeframe_metrics = dispatcher.getTimeframeMetrics()
     trips = dispatcher.getAnimationTrips()
     kiosk_metrics = dispatcher.getKioskTimeframeMetrics()
+    looplength = dispatcher.getFinalTimeInSec()
 
     animation_data_file_dict = {
         "center_coordinates": center_coordinates,
@@ -512,7 +516,8 @@ def prepare_simulation():
         "trips": trips,
         "kiosks": lst_kiosk_dict_animation,
         "kiosk_metrics": kiosk_metrics,
-        "road_network": polylinesGeoJSON
+        "road_network": polylinesGeoJSON,
+        "looplength": looplength,
     }
 
     with open("AnimationDataFile.json", "w") as f:
@@ -540,6 +545,7 @@ def animation():
     kiosks = animation_data_file_dict['kiosks']
     kiosk_metrics = animation_data_file_dict['kiosk_metrics']
     road_network = animation_data_file_dict['road_network']
+    looplength = animation_data_file_dict['looplength']
 
     html = render_template("index.html",
                             center_coordinates=center_coordinates,
@@ -549,7 +555,8 @@ def animation():
                             kiosk_metrics = kiosk_metrics,
                             road_network = road_network,
                             EOD_metrics = EOD_metrics,
-                            timeframe_metrics = timeframe_metrics)
+                            timeframe_metrics = timeframe_metrics,
+                            looplength = looplength)
     response = make_response(html)
     return response
 
@@ -685,7 +692,7 @@ def main(argv):
         CITY_NAME = "PERTH_AMBOY_TESTING"
         create_animation(CITY_NAME)
 
-    app.run(host="localhost", port=8000, debug=False)
+    app.run(host="0.0.0.0", port=8000, debug=False)
     # Go on http://localhost:8000/animation?city_choice=TRENTON_TESTING
 
 #Comment out before updating PythonAnywhere

@@ -337,6 +337,8 @@ class Dispatcher:
         }
         self.timeframe_metrics[curr_time_in_sec] = timeframe_metric_entry
 
+    def saveFinalTimeInSec(self, final_time_in_sec):
+        self.final_time_in_sec = final_time_in_sec
 
     ############################################################################
 
@@ -677,6 +679,9 @@ class Dispatcher:
             # Iterate time by time step
             curr_time_in_sec += self.TIME_STEP
 
+        # Save last time step
+        self.saveFinalTimeInSec(curr_time_in_sec)
+
         # Save EOD metrics
         self.saveEODMetrics()
 
@@ -697,3 +702,6 @@ class Dispatcher:
 
     def getKioskTimeframeMetrics(self):
         return self.kiosk_timeframe_metrics
+
+    def getFinalTimeInSec(self):
+        return self.final_time_in_sec
