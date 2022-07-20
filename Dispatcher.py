@@ -616,6 +616,8 @@ class Dispatcher:
                 # Send all the vehicles that this kiosk needs
                 # Keep giving this needy kiosk vehicles until its net vehicle balance becomes 0
                 while kiosk_with_excess.getNetVehicleBalance() > 1:
+                    if (len(lst_kiosks_with_low_num_vehicles) == 0):
+                        break
                     if (len(kiosk_with_excess.getAllPassengerGroups()) != 0):
                         for vehicle, passenger_grouping in list(
                                 zip(kiosk_with_excess.getVehicles(),kiosk_with_excess.getAllPassengerGroups())):
@@ -636,8 +638,6 @@ class Dispatcher:
                                 break
 
                     else:
-                        if (len(lst_kiosks_with_low_num_vehicles) == 0):
-                            break
                         if (kiosk_with_excess.getNetVehicleBalance() <= 1):
                             break
                         closest_kiosk_needing_vehicles = self.getClosestKioskToKiosk(lst_kiosks_with_low_num_vehicles, kiosk_with_excess, self.kiosk_to_kiosk_route_matrix)
