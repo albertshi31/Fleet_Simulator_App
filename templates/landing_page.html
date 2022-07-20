@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Landing Page</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <style>
+    html, body {
+        margin: 0;
+        height: 100%;
+    }
+    </style>
+  </head>
+  <body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light fixed-top">
+      <a class="navbar-brand" href="#">TransitAV</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link" href="/choose_city">Choose City</a>
+          </li>
+          <li class="nav-item">
+            <a id="navbarlink" class="nav-link" href="/animation">Animation</a>
+          </li>
+          <li class="nav-item">
+            <a id="navbarlink" class="nav-link" href="/graphs">Graphs</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- <div class="container h-100 d-flex justify-content-center">
+      <div class="form-group jumbotron my-auto">
+      <form action="/animation">
+          <label for="city-choice">Choose a City:</label>
+          <input list="city-choices" id="city-choice" name="city-choice" />
+
+          <datalist id="city-choices">
+              <option value="Trenton">
+          </datalist>
+          <small id="emailHelp" class="form-text text-muted">This will load pre-generated files.<br>Takes ~30 seconds.</small>
+        <br />
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </form>
+      </div>
+    </div> -->
+    <div class="container h-100 d-flex justify-content-center">
+      <div class="form-group jumbotron my-auto">
+      <form action="/create_animation">
+          <label for="city_name">City Name (use underscores)</label>
+          <input id="city_name" type="text" name="city_name" required></input>
+          <br />
+
+          <label for="depot_data_csv">Depot CSV Filename</label>
+          <input id="depot_data_csv" type="text" name="depot_data_csv" value="Depots.csv" required></input>
+          <br />
+
+          <label for="lst_trip_data_csv">List of Trip Data Filenames</label>
+          <input id="lst_trip_data_csv" type="text" name="lst_trip_data_csv" value="FinalOriginPixelXXXXX_X.csv, ..." size="50" required></input>
+          <br />
+
+          <label for="lst_fleetsize">Fleetsize(s)</label>
+          <input id="lst_fleetsize" type="text" name="lst_fleetsize" value="100" required></input>
+          <br />
+
+          <label for="modesplit">Modesplit (%)</label>
+          <input id="modesplit" type="number" name="modesplit" step="any" value="10" min="0" max="100" required></input>
+          <small class="form-text text-muted">What percentage of total trips are done using this vehicle network.</small>
+          <br />
+
+          <label for="min_lat">Mininum Latitude</label>
+          <input id="min_lat" type="number" step="any" name="min_lat" required></input>
+
+          <label for="max_lat">Maximum Latitude</label>
+          <input id="max_lat" type="number" step="any" name="max_lat" required></input>
+          <br />
+
+          <label for="min_lng">Mininum Longitude</label>
+          <input id="min_lng" type="number" step="any" name="min_lng" required></input>
+
+          <label for="max_lng">Maximum Longitude</label>
+          <input id="max_lng" type="number" step="any" name="max_lng" required></input>
+          <br />
+
+          <label for="angry_passenger_threshold_sec">Angry Passenger Threshold (seconds)</label>
+          <input id="angry_passenger_threshold_sec" type="number" step="1" name="angry_passenger_threshold_sec" value="1200" required></input>
+          <small class="form-text text-muted">Max amount of time a passenger waits for pickup before they leave.</small>
+        <br />
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </form>
+      </div>
+    </div>
+
+
+    <!-- <form action="/create_animation" id="params">
+      <label for="fleetsize">Fleetsize:</label><br>
+      <input type="number" id="fleetsize" name="fleetsize" value=100 min=58>
+      <br>
+      <label for="modesplit">Mode-Split (%):</label><br>
+      <input type="number" step="any" id="modesplit" name="modesplit" value=100 min=0 max=100>
+      <br><br>
+      <input type="submit" value="Submit">
+    </form> -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+    <script>
+      $(document).ready(function() {
+        $("#params").submit(function() {
+          alert("Parameters saved! Press \"OK\" to begin calculating.\r\nThis process might take several minutes.");
+        });
+      });
+
+    </script>
+  </body>
+</html>

@@ -72,3 +72,6 @@ class Passenger:
 
     def getAddedTriptime(self):
         return self.total_triptime - self.alone_triptime
+
+    def getDepartureTime(self):
+        return self.odeparturetime

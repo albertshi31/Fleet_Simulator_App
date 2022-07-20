@@ -14,7 +14,7 @@ center_coordinates = received_data['center_coordinates']
 kiosks_dict = received_data['kiosks_dict']
 routes_dict = received_data['routes_dict']
 fleetsize = int(received_data['fleetsize'])
-modesplit = float(received_data['modesplit']) / 100
+modesplit = .05
 pax_waittime_threshold = int(received_data['pax_waittime_threshold'])
 max_circuity = float(received_data['max_circuity']) / 100
 MAX_CAPACITY = 2
@@ -35,12 +35,35 @@ for key, value in kiosks_dict.items():
     lst_kiosk_dict_animation.append({'coordinates': [lng, lat], 'msg': str(new_kiosk)})
     kiosk_id += 1
 
-lst_all_passengers = []
+lst_all_passengers_within_ODD = []
 for filename in ['34_NewJersey/2020_OriginPixel34021_1.csv', '34_NewJersey/2020_OriginPixel34021_2.csv']:
     df = pd.read_csv("local_static/" + filename)
     curr_lst_pax = [Passenger(personID, lat, lng, dest_lat, dest_lng, oxcoord, oycoord, dxcoord, dycoord, odeparturetime, max_circuity) for personID, lat, lng, dest_lat, dest_lng, oxcoord, oycoord, dxcoord, dycoord, odeparturetime in \
-    zip(df['Person ID'], df['OLat'], df['OLon'], df['DLon'], df['DLon'], df['OXCoord'], df['OYCoord'], df['DXCoord'], df['DYCoord'], df['ODepartureTime']) if (oxcoord, oycoord) in lst_kiosk_pixels and (dxcoord, dycoord) in lst_kiosk_pixels and (oxcoord, oycoord) != (dxcoord, dycoord) and random() <= modesplit]
-    lst_all_passengers.extend(curr_lst_pax)
+    zip(df['Person ID'], df['OLat'], df['OLon'], df['DLon'], df['DLon'], df['OXCoord'], df['OYCoord'], df['DXCoord'], df['DYCoord'], df['ODepartureTime']) if (oxcoord, oycoord) in lst_kiosk_pixels and (dxcoord, dycoord) in lst_kiosk_pixels and (oxcoord, oycoord) != (dxcoord, dycoord)]
+    lst_all_passengers_within_ODD.extend(curr_lst_pax)
+
+df_departure_times = pd.DataFrame([pax.getDepartureTime() for pax in lst_all_passengers_within_ODD], columns=["DepartureTime"])
+print("Num Pax", len(lst_all_passengers_within_ODD))
+
+bins = range(0, max(df_departure_times['DepartureTime'])+TIME_STEP, TIME_STEP)
+times = pd.Series(df_departure_times['DepartureTime'])
+groups = pd.cut(times, bins=bins)
+timestep_departure_counts = groups.value_counts(sort=False).to_list()
+max_timestep_count = max(timestep_departure_counts)
+modesplits_by_timestep = []
+for count in timestep_departure_counts:
+    if count == 0:
+        modesplits_by_timestep.append(0)
+    else:
+        modesplits_by_timestep.append(min(1, (modesplit * max_timestep_count) / count))
+
+print(modesplits_by_timestep)
+
+lst_all_passengers = []
+for pax in lst_all_passengers_within_ODD:
+    modesplit = modesplits_by_timestep[pax.getDepartureTime()//TIME_STEP]
+    if random() <= modesplit:
+        lst_all_passengers.append(pax)
 
 lst_all_passengers.sort(key=lambda pax:pax.odeparturetime)
 

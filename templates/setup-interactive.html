@@ -129,8 +129,8 @@
         <div class="modal-body" id="submitModalBody">
           <div class="form-group">
           <form id="createAnimationForm">
-              <label for="city_name">City Name</label>
-              <input id="city_name" type="text" name="city_name" required></input>
+              <label for="odd_name">ODD Name</label>
+              <input id="odd_name" type="text" name="odd_name" required></input>
               <br />
 
               <label for="fleetsize">Fleetsize</label>
@@ -312,7 +312,7 @@
       <!-- <div id="connectKiosksDiv">
         Marker 1: <span id="connectKiosksDiv_marker1"></span><br />
         Marker 2: <span id="connectKiosksDiv_marker2"></span><br /> --->
-        <button type="button" class="btn btn-info" onclick="getRoute()">Connect Kiosks</button>
+        <button type="button" class="btn btn-info" onclick="getRoute()" id="connect_kiosks_button">Connect Kiosks</button>
       <!-- </div> --->
 
       <div class="btn-group" role="group" aria-label="Button Group">
@@ -330,6 +330,12 @@
         <button class="btn btn-primary" type="button" disabled>
           <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
           Loading Kiosks...
+        </button>
+      </div>
+      <div class="loading-icon" id="loading_road_network_icon">
+        <button class="btn btn-primary" type="button" disabled>
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          Connecting Kiosks...
         </button>
       </div>
     </div>
@@ -350,6 +356,10 @@
     }
     $("#kiosks").hide();
     $("#routenetwork").hide();
+    $('#loading_road_network_icon').hide();
+    $('#simulate_trips_button').prop('disabled', true);
+    $('#connect_kiosks_button').prop('disabled', true);
+
     var locality_name;
     var county_name;
     var state_name;
@@ -417,7 +427,7 @@
 
         fixMapBounds(bbox[1], bbox[0], bbox[3], bbox[2]);
 
-        $("#city_name").val(locality_name+", "+state_name);
+        $("#odd_name").val(locality_name+", "+state_name);
 
         drawPixelGrid();
       },
@@ -468,7 +478,10 @@
       delete markers[marker_id];
       delete circles[marker_id];
       // Route Network is not up to date, must first connect kiosks before running simulation
+      // Make sure to enable connect kiosks button
       $('#simulate_trips_button').prop('disabled', true);
+      $('#connect_kiosks_button').prop('disabled', false);
+
       $("#panel_"+marker_id).remove();
       if (Object.keys(markers).length == 1) {
         $("#routenetwork").hide();
@@ -541,7 +554,9 @@
     function placeKiosk(input_name, category, lat, lng) {
       $('#routenetwork').show();
       // Route Network is not up to date, must first connect kiosks before running simulation
+      // Make sure to enable connect kiosks button
       $('#simulate_trips_button').prop('disabled', true);
+      $('#connect_kiosks_button').prop('disabled', false);
 
       getNearestCoord(lat, lng, function(lat, lng, name) {
         if (input_name == false) {
@@ -590,7 +605,10 @@
         var latlng = e.target.getLatLng();
         getNearestCoord(latlng.lat, latlng.lng, function(lat, lng) {
           // Route Network is not up to date, must first connect kiosks before running simulation
+          // Make sure to enable connect kiosks button
           $('#simulate_trips_button').prop('disabled', true);
+          $('#connect_kiosks_button').prop('disabled', false);
+
           marker.setLatLng([lat, lng]);
           circles[marker._leaflet_id].setLatLng([lat, lng]);
           $('#panel_loc_'+marker._leaflet_id).text(lat.toFixed(5) + ";" + lng.toFixed(5));
@@ -756,6 +774,9 @@
         return;
       }
 
+      $('#loading_road_network_icon').show();
+
+
       var lst_marker_latlngs = [];
       for (let key in markers) {
         latlng = markers[key].getLatLng();
@@ -833,8 +854,12 @@
                 weight: 3
             });
           });
-          // Route Network is up to date, enable simulation button
+          // Route Network is up to date, enable simulation button and disable connect kiosks button
           $('#simulate_trips_button').prop('disabled', false);
+          $('#connect_kiosks_button').prop('disabled', true);
+
+          // Hide the connecting kiosks loading icon
+          $('#loading_road_network_icon').hide();
 
           // polyline.on('click', function(e){
           //   polylineLayerGroup.removeLayer(polyline);
@@ -1012,7 +1037,7 @@
       var polylinesGeoJSON = polylineLayerGroup.toGeoJSON();
 
       var submitData = {
-        "city_name": locality_name,
+        "odd_name": locality_name+", "+state_name,
         "avoidLocationsGeoJSON": avoidLocationsGeoJSON,
         "markersGeoJSON": markersGeoJSON,
         "circlesGeoJSON": circlesGeoJSON,
