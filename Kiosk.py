@@ -80,6 +80,8 @@ class Kiosk:
             pax.setServed(curr_time_in_sec)
         key = min(passenger_group, key=lambda pax: pax.odeparturetime).odeparturetime
         self.dict_lst_lsts_passenger_groupings[key].remove(passenger_group)
+        if (self.dict_lst_lsts_passenger_groupings[key] == []):
+            del self.dict_lst_lsts_passenger_groupings[key]
 
     def addArrivingPassengers(self, lst_passenger_objects):
         self.lst_all_arriving_passengers.extend(lst_passenger_objects)

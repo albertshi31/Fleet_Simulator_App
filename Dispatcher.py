@@ -443,7 +443,7 @@ class Dispatcher:
                 pax.setTripInfo(self.kiosk_to_kiosk_route_matrix[str([pax.kiosk.getLatLng(), pax.dest_kiosk.getLatLng()])]['duration'],
                                 self.kiosk_to_kiosk_route_matrix[str([pax.kiosk.getLatLng(), pax.dest_kiosk.getLatLng()])]['distance'])
 
-            # Iterate through kiosks and assign waiting passengers to vehicles
+           # Iterate through kiosks and assign waiting passengers to vehicles
             for kiosk in self.lst_all_kiosk_objects:
                 # Get list of new departing passengers that showed up within the last time step
                 lst_passengers_new_departing_at_kiosk = kiosk.getNewDepartingPassengerObjects()
@@ -541,6 +541,7 @@ class Dispatcher:
             lst_kiosks_in_need_of_vehicle = []
             lst_kiosks_with_excess_vehicles = []
             for kiosk in self.lst_all_kiosk_objects:
+                kiosk.updateNetVehicleBalance(self.passenger_waittime_threshold)
                 # Find all kiosks in need of a vehicle
                 if kiosk.getNetVehicleBalance() < 0:
                     lst_kiosks_in_need_of_vehicle.append(kiosk)
