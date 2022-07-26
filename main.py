@@ -13,7 +13,7 @@ import shutil
 from DepotMatrixAndBuildings import DepotMatrixAndBuildings
 #from SortRoutesByPriority import Graph
 import h3
-from random import sample, random
+from random import sample, random, randrange
 import polyline
 import numpy as np
 from ratelimiter import RateLimiter
@@ -22,7 +22,7 @@ from Dispatcher import Dispatcher
 from Passenger import Passenger
 from Kiosk import Kiosk
 
-from helper_functions import create_pixel_grid, latlng_to_xypixel, xypixel_to_latlng, get_locations_precalculated_kiosks
+from helper_functions import create_pixel_grid, latlng_to_xypixel, xypixel_to_latlng, get_locations_kiosks_in_regions
 import pandas as pd
 
 global THIS_FOLDER
@@ -48,59 +48,72 @@ def test():
 
 @app.route("/")
 def landing_page():
-    
-    html = render_template("landing_page.html")
+    odd_choices = []
+    dir_names = os.listdir("user_data")
+    for dir_name in dir_names:
+        with open(os.path.join("user_data", dir_name, "meta_data.json"), "r") as f:
+            meta_data = json.load(f)
+            meta_data["dir"] = dir_name
+            odd_choices.append(meta_data)
+    html = render_template("landing_page.html", odd_choices = odd_choices)
     response = make_response(html)
     return response
 
-
-@app.route("/setup")
-def setup():
-    html = render_template("setup.html")
-    response = make_response(html)
-    return response
 
 # TODO: Does not work for multi-polygons yet
 @app.route("/setup-interactive")
 def setup_interactive():
+    odd_choice_dir = request.args.get("odd_choice")
+    # If no ODD is selected, make sure to choose new folder name to save it in
+    if odd_choice_dir is None:
+        random_dir_name = randrange(10000, 99999)
+        dir_names = os.listdir("user_data")
+        while random_dir_name in dir_names:
+            random_dir_name = randrange(10000, 99999)
+        odd_choice_dir = random_dir_name
+
     token = 'pk.eyJ1IjoiZ2xhbmlld3NraSIsImEiOiJja28weW13eHEwNWNwMnZzNTZyZzRrMDN4In0.P2-EylpYdzmCgdASgAKC5g'
     jawg_accessToken = 'uUILlBVmedZhJqrmWPczZMS9ytaAuTPvGqX5Z3bCC30qlHe2DSJCQZABdbznjyGr'
-    html = render_template("setup-interactive.html", mapbox_access_token = token, jawg_accessToken = jawg_accessToken)
+    html = render_template("setup-interactive.html", mapbox_access_token = token, jawg_accessToken = jawg_accessToken, odd_choice_dir = odd_choice_dir)
     response = make_response(html)
     return response
 
+# Render ODD in setup_interactive page
+@app.route("/load_odd")
+def load_ODD():
+    dir_name = request.args.get("odd_choice_dir")
+    response = {}
+    if dir_name in os.listdir("user_data"):
+        with open(os.path.join("user_data", dir_name, "setup_interactive.json"), "r") as f:
+            response = json.load(f)
+        response["status"] = "FOUND"
+    else:
+        response["status"] = "NOT FOUND"
+    return response
+
 # Extract zipped files that contain person trips within the county
-def extract_person_trip_files_helper(county_name, state_name):
+def extract_person_trip_files_helper(lst_county_state):
+    global list_of_unzipped_files
+    list_of_unzipped_files = []
     af = addfips.AddFIPS()
-    fips_code = af.get_county_fips(county_name, state=state_name)
-    global THIS_FOLDER
-    for filename in os.listdir(os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed")):
-        if state_name.replace(" ", "") in filename:
-            filepath = os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed", filename)
-            print(filepath)
-            with ZipFile(filepath, 'r') as f:
-                list_of_zipped_files = ZipFile.namelist(f)
-                list_of_files_to_unzip = [filename for filename in list_of_zipped_files if fips_code in filename]
-                f.extractall(os.path.join(THIS_FOLDER, "local_static"), members = list_of_files_to_unzip)
-                global list_of_unzipped_files
-                list_of_unzipped_files = list_of_files_to_unzip
-            break
+    for county_name, state_name in lst_county_state:
+        fips_code = af.get_county_fips(county_name, state=state_name)
+        global THIS_FOLDER
+        for filename in os.listdir(os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed")):
+            if state_name.replace(" ", "") in filename:
+                filepath = os.path.join(THIS_FOLDER, "local_static", "StateTripFiles_Compressed", filename)
+                print(filepath)
+                with ZipFile(filepath, 'r') as f:
+                    list_of_zipped_files = ZipFile.namelist(f)
+                    list_of_files_to_unzip = [filename for filename in list_of_zipped_files if fips_code in filename]
+                    f.extractall(os.path.join(THIS_FOLDER, "local_static"), members = list_of_files_to_unzip)
+                    list_of_unzipped_files.extend(list_of_files_to_unzip)
+                break
 
 def isInBoundsLatLng(lat, lng, min_lat, max_lat, min_lng, max_lng):
     result1 = lat >= min_lat and lat <= max_lat
     result2 = lng >= min_lng and lng <= max_lng
     return result1 and result2
-
-def filter_person_trip_files(list_of_unzipped_files):
-    global person_trip_lst_latlngs
-    person_trip_lst_latlngs = []
-    for filename in list_of_unzipped_files:
-        df = pd.read_csv(filename)
-        lst_olatlngs = [(lat, lng) for lat, lng, dist in zip(df['OLat'], df['OLon'], df['GCDistance']) if dist > 0.707]
-        person_trip_lst_latlngs.extend(lst_olatlngs)
-        lst_dlatlngs = [(lat, lng) for lat, lng, dist in zip(df['DLat'], df['DLon'], df['GCDistance']) if dist > 0.707]
-        person_trip_lst_latlngs.extend(lst_dlatlngs)
-
 
 #decode an encoded string
 def decode(encoded):
@@ -150,7 +163,7 @@ def getTimestamps(lst_route_leg_maneuvers, route_duration, len_route_latlngs):
 def getRouteMeta(latlng1, latlng2):
     loc = "{},{};{},{}".format(latlng1[1], latlng1[0], latlng2[1], latlng2[0])
     url = "http://localhost:5000/route/v1/driving/"
-    r = requests.get(url + loc + "?overview=full&annotations=true&exclude=motorway")
+    r = requests.get(url + loc + "?overview=full&annotations=true&exclude=motorway") #&exclude=motorway
     res = r.json()
     raw_timestamps = res['routes'][0]['legs'][0]['annotation']['duration']
     raw_timestamps.insert(0, 0) # raw_timestamps gives list of times you should add to previous sum
@@ -250,23 +263,20 @@ def get_route():
     # print(response)
     # return response
 
-@app.route("/extract_person_trip_files")
+@app.route("/extract_files", methods=['POST'])
 def extract_person_trip_files():
-    county_name = request.args.get('county_name')
-    state_name = request.args.get('state_name')
+    received_data = request.get_json()
 
-    extract_person_trip_files_helper(county_name, state_name)
+    lst_county_state = received_data["lst_county_state"]
+    deduped_lst_county_state = []
+    [deduped_lst_county_state.append(x) for x in lst_county_state if x not in deduped_lst_county_state]
+    print(deduped_lst_county_state)
 
-    global list_of_unzipped_files
+    extract_person_trip_files_helper(deduped_lst_county_state)
 
-    input_datafeed_trip_data = []
-    for trip_data_csv in list_of_unzipped_files:
-        input_datafeed_trip_data.append("local_static/" + trip_data_csv)
+    print("EXTRACTED FILES")
 
-    filter_person_trip_files(input_datafeed_trip_data)
-    global person_trip_lst_latlngs
-    return { "numTripsInKioskNetwork": len(person_trip_lst_latlngs) }
-
+    return {"status": "SUCCESS"}
 
 @app.route("/get_heatmap")
 def get_heatmap():
@@ -298,9 +308,9 @@ def get_pixel_grid():
     south_lat = float(request.args.get("south"))
     east_lng = float(request.args.get("east"))
     west_lng = float(request.args.get("west"))
-    geometry_collection = create_pixel_grid(north_lat, south_lat, east_lng, west_lng)
+    feature_collection = create_pixel_grid(north_lat, south_lat, east_lng, west_lng)
 
-    return { "pixel_grid_geojson": geometry_collection }
+    return { "pixel_grid_geojson": feature_collection }
 
 @app.route("/get_geocoded_address")
 def get_geocoded_address():
@@ -337,37 +347,93 @@ def get_geocoded_address():
     return response
 
 
-@app.route("/draw_precalculated_kiosks")
+@app.route("/draw_precalculated_kiosks", methods=['POST'])
 def draw_precalculated_kiosks():
-    north_lat = float(request.args.get("north"))
-    south_lat = float(request.args.get("south"))
-    east_lng = float(request.args.get("east"))
-    west_lng = float(request.args.get("west"))
-    feature_geojson_url_path = request.args.get("feature_geojson_url_path")
+    received_data = request.get_json()
 
-    global person_trip_lst_latlngs
-    lst_marker_latlngs = get_locations_precalculated_kiosks(north_lat, south_lat, east_lng, west_lng, feature_geojson_url_path, person_trip_lst_latlngs)
+    north_lat = float(received_data["north"])
+    south_lat = float(received_data["south"])
+    east_lng = float(received_data["east"])
+    west_lng = float(received_data["west"])
+    regions_osm_geojsons = received_data["regions_osm_geojsons"]
 
-    return { "lst_marker_latlngs": lst_marker_latlngs }
+    # Get all possible kiosk locations (whose centroids lie within the regions created by user)
+    lst_kiosk_pixels = get_locations_kiosks_in_regions(north_lat, south_lat, east_lng, west_lng, regions_osm_geojsons)
+
+    # Track kiosk metrics
+    global list_of_unzipped_files
+
+    lst_trips_within_odd = []
+    for filename in list_of_unzipped_files:
+        print(filename)
+        df = pd.read_csv("local_static/" + filename)
+        lst_trips = [(oxcoord, oycoord, dxcoord, dycoord) for oxcoord, oycoord, dxcoord, dycoord, dist in zip(df['OXCoord'], df['OYCoord'], df['DXCoord'], df['DYCoord'], df['GCDistance']) \
+        if (oxcoord, oycoord) in lst_kiosk_pixels and (dxcoord, dycoord) in lst_kiosk_pixels and dist > 0.707]
+        lst_trips_within_odd.extend(lst_trips)
+
+    print(len(lst_trips_within_odd))
+    # Instantiate dict with kiosk metrics we will track
+    dict_pixel_info = {}
+    for xypixel in lst_kiosk_pixels:
+        dict_pixel_info[xypixel] = {
+            "sumOTrips": 0,
+            "sumDTrips": 0
+        }
+
+    for oxcoord, oycoord, dxcoord, dycoord in lst_trips_within_odd:
+        opixel = (oxcoord, oycoord)
+        dict_pixel_info[opixel]["sumOTrips"] += 1
+        dpixel = (dxcoord, dycoord)
+        dict_pixel_info[dpixel]["sumDTrips"] += 1
+
+    # Only return the top kiosks that serve at least 90% of total oTrips
+    sumOTrips = 0
+    result_lst_kiosk_pixels = []
+    print("BEGIN SORT")
+    for pixel, value in sorted(dict_pixel_info.items(), key=lambda item: item[1]["sumOTrips"], reverse=True):
+        result_lst_kiosk_pixels.append(pixel)
+        sumOTrips += value["sumOTrips"]
+        if sumOTrips/len(lst_trips_within_odd) >= 1:
+            break
+    print("END SORT")
+
+    result_lst_marker_latlngs = []
+    for xcoord, ycoord in result_lst_kiosk_pixels:
+        lat, lng = xypixel_to_latlng(xcoord, ycoord)
+        result_lst_marker_latlngs.append([lat, lng])
+
+    # Convert dict keys to string
+    stringify_dict_pixel_info = {}
+    for key, value in dict_pixel_info.items():
+        stringify_dict_pixel_info[str(key)] = value
+
+    result = {
+        "lst_marker_latlngs": result_lst_marker_latlngs,
+        "numTripsInKioskNetwork": len(lst_trips_within_odd),
+        "dict_pixel_info": stringify_dict_pixel_info
+    }
+
+    print(result)
+
+    return result
 
 @app.route("/save_ODD", methods=['POST'])
 def save_ODD():
     received_data = request.get_json()
 
-    city_name = received_data['city_name']
-    avoidLocationsGeoJSON = received_data['avoidLocationsGeoJSON']
-    markersGeoJSON = received_data['markersGeoJSON']
-    circlesGeoJSON = received_data['circlesGeoJSON']
-    polylinesGeoJSON = received_data['polylinesGeoJSON']
+    odd_choice_dir = received_data["odd_choice_dir"]
 
-    with open("static/" + city_name + "/avoidLocationsGeoJSON.geojson", "w") as f:
-        json.dump(avoidLocationsGeoJSON, f)
-    with open("static/" + city_name + "/markersGeoJSON.geojson", "w") as f:
-        json.dump(markersGeoJSON, f)
-    with open("static/" + city_name + "/circlesGeoJSON.geojson", "w") as f:
-        json.dump(circlesGeoJSON, f)
-    with open("static/" + city_name + "/polylinesGeoJSON.geojson", "w") as f:
-        json.dump(polylinesGeoJSON, f)
+    os.mkdir(os.path.join("user_data", str(odd_choice_dir)))
+
+    meta_data_dict = received_data["meta_data_dict"]
+
+    with open(os.path.join("user_data", str(odd_choice_dir), "meta_data.json"), "w") as f:
+        json.dump(meta_data_dict, f)
+
+    setup_interactive_dict = received_data["setup_interactive_dict"]
+
+    with open(os.path.join("user_data", str(odd_choice_dir), "setup_interactive.json"), "w") as f:
+        json.dump(setup_interactive_dict, f)
 
     response = {
         "message": "Your ODD saved successfully."
@@ -452,12 +518,7 @@ def getCompleteRoutesMatrix(lst_latlngs, routes_dict):
 def prepare_simulation():
     received_data = request.get_json()
 
-    with open("InitSimTestData_Trenton.json", "w") as f:
-        json.dump(received_data, f)
-
-    # CITY_NAME = received_data['city_name']
-    # county_name = received_data['county_name']
-    # state_name = received_data['state_name']
+    odd_choice_dir = received_data['odd_choice_dir']
     center_coordinates = received_data['center_coordinates']
     kiosks_dict = received_data['kiosks_dict']
     routes_dict = received_data['routes_dict']
@@ -487,10 +548,11 @@ def prepare_simulation():
     for filename in list_of_unzipped_files:
         df = pd.read_csv("local_static/" + filename)
         curr_lst_pax = [Passenger(personID, lat, lng, dest_lat, dest_lng, oxcoord, oycoord, dxcoord, dycoord, odeparturetime, max_circuity) for personID, lat, lng, dest_lat, dest_lng, oxcoord, oycoord, dxcoord, dycoord, odeparturetime in \
-        zip(df['Person ID'], df['OLat'], df['OLon'], df['DLon'], df['DLon'], df['OXCoord'], df['OYCoord'], df['DXCoord'], df['DYCoord'], df['ODepartureTime']) if (oxcoord, oycoord) in lst_kiosk_pixels and (dxcoord, dycoord) in lst_kiosk_pixels and (oxcoord, oycoord) != (dxcoord, dycoord) and random() <= modesplit]
+        zip(df['Person ID'], df['OLat'], df['OLon'], df['DLon'], df['DLon'], df['OXCoord'], df['OYCoord'], df['DXCoord'], df['DYCoord'], df['ODepartureTime']) if (oxcoord, oycoord) in lst_kiosk_pixels and (dxcoord, dycoord) in lst_kiosk_pixels and (oxcoord, oycoord) != (dxcoord, dycoord)]
         lst_all_passengers_within_ODD.extend(curr_lst_pax)
 
     df_departure_times = pd.DataFrame([pax.getDepartureTime() for pax in lst_all_passengers_within_ODD], columns=["DepartureTime"])
+    print("Num Pax", len(lst_all_passengers_within_ODD))
 
     bins = range(0, max(df_departure_times['DepartureTime'])+TIME_STEP, TIME_STEP)
     times = pd.Series(df_departure_times['DepartureTime'])
@@ -503,6 +565,8 @@ def prepare_simulation():
             modesplits_by_timestep.append(0)
         else:
             modesplits_by_timestep.append(min(1, (modesplit * max_timestep_count) / count))
+
+    print(len(groups), len(modesplits_by_timestep))
 
     lst_all_passengers = []
     for pax in lst_all_passengers_within_ODD:
@@ -540,20 +604,23 @@ def prepare_simulation():
         "looplength": looplength,
     }
 
-    with open("AnimationDataFile.json", "w") as f:
+    with open(os.path.join("user_data", str(odd_choice_dir), "animation_data_file.json"), "w") as f:
         json.dump(animation_data_file_dict, f)
 
     # get execution time
     runtime=time.time()-start_time
 
     response = {
-    'runtime': runtime
+    'runtime': runtime,
+    'odd_choice': odd_choice_dir
     }
     return response
 
 @app.route("/animation")
 def animation():
-    with open("AnimationDataFile.json", "r") as f:
+    odd_choice_dir = request.args.get("odd_choice")
+
+    with open(os.path.join("user_data", str(odd_choice_dir), "animation_data_file.json"), "r") as f:
         animation_data_file_dict = json.load(f)
 
     # Retrieve all values from the data file
@@ -579,114 +646,6 @@ def animation():
                             looplength = looplength)
     response = make_response(html)
     return response
-
-
-def saveAnimationData(create_animation_dict):
-    city_name = create_animation_dict['CITY_NAME']
-    with open("static/" + city_name + "/createanimationdict.json", "w") as f:
-        json.dump(create_animation_dict, f)
-
-def create_animation(CITY_NAME):
-    with open("static/" + CITY_NAME + "/createanimationdict.json", "r") as f:
-        create_animation_dict = json.load(f)
-
-    CITY_NAME = create_animation_dict['CITY_NAME']
-    #depot_data_filename = create_animation_dict['depot_data_filename']
-    #depot_matrix = create_animation_dict['depot_matrix']
-    #person_trips_in_kiosk_network = create_animation_dict['person_trips_in_kiosk_network']
-    person_trips_csv_header = create_animation_dict['person_trips_csv_header']
-    #modesplit = create_animation_dict['modesplit']
-    #lst_fleetsize = create_animation_dict['lst_fleetsize']
-    center_lng_lat = create_animation_dict['center_lng_lat']
-
-    depot_data_filename = "PERTH_AMBOY_TESTING_AV_Stations.csv"
-    with open("static/" + CITY_NAME + "/depotmatrix.json", "r") as f:
-        depot_matrix = json.load(f)
-
-    with open("static/" + CITY_NAME + "/person_trips_in_xypixel_ODD.json") as f:
-        person_trips_in_xypixel_ODD = json.load(f)['person_trips_in_xypixel_ODD']
-
-
-    lst_fleetsize = [50]
-    modesplit = 25.0
-
-    start_time = time.time()
-
-    # TODO: Allow users to choose these variables
-    angry_passenger_threshold_sec = 300
-
-    lst_passengers_left = []
-
-    aDispatcher = Dispatcher(CITY_NAME, angry_passenger_threshold_sec, depot_matrix)
-    depot_csv_name = os.path.join(THIS_FOLDER, "static", CITY_NAME, depot_data_filename)
-    aDispatcher.createDataFeed(depot_csv_name, person_trips_in_xypixel_ODD, person_trips_csv_header, modesplit)
-
-
-    for idx, fleetsize in enumerate(lst_fleetsize):
-        print("Fleetsize:", fleetsize)
-        aDispatcher.resetDataFeed()
-        aDispatcher.createNumVehicles(fleetsize)
-        index_metrics, trips, depot_locations, missed_passengers, waiting, metrics, metric_animations, last_arrival_at_depot_time, looplength, runtime = aDispatcher.solve()
-        passengers_left = index_metrics[1]
-        lst_passengers_left.append(passengers_left)
-        print("MISSED PASSENGERS:", passengers_left)
-        if (passengers_left == 0) or (idx == len(lst_fleetsize)-1):
-            print("DONE, PRINTING RESULTS")
-            # Write to files
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "index_metrics.txt")
-            with open(my_file, "w") as f:
-                index_metrics.append(fleetsize)
-                f.write(str(index_metrics))
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "looplength.txt")
-            with open(my_file, "w") as f:
-                f.write(str(looplength))
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "trips.json.gz")
-            compress_json.dump(trips, my_file)
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "depot_locations.txt")
-            with open(my_file, "w") as f:
-                f.write(str(depot_locations))
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "missed_passengers.json.gz")
-            compress_json.dump(missed_passengers, my_file)
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "waiting.json.gz")
-            compress_json.dump(waiting, my_file)
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metrics.json.gz")
-            compress_json.dump(metrics, my_file)
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "metric_animations.json.gz")
-            compress_json.dump(metric_animations, my_file)
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "looplength.txt")
-            with open(my_file, "w") as f:
-                f.write(str(looplength))
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "runtime.txt")
-            with open(my_file, "w") as f:
-                f.write(str(runtime))
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "pax_left_vs_fleetsize.txt")
-            with open(my_file, "w") as f:
-                f.write(str([lst_fleetsize, lst_passengers_left]))
-
-            my_file = os.path.join(THIS_FOLDER, "static", CITY_NAME, "viewstate_coordinates.txt")
-            with open(my_file, "w") as f:
-                avg_lat = center_lng_lat[1]
-                avg_lng = center_lng_lat[0]
-                f.write(str([avg_lat, avg_lng]))
-
-            break
-
-    runtime=time.time()-start_time
-    response = {
-    'runtime': runtime
-    }
-    return response
-
 
 
 @app.route("/graphs")

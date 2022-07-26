@@ -193,4 +193,3 @@ class Kiosk:
         # and the combination of (incoming vehicles that arrive before the first passenger group departs) and (vehicles it currently has at the kiosk)
         num_incoming_vehicles = len(self.lst_tuples_of_incoming_vehicle_objects_and_arrival_times)
         return (len(self.lst_vehicle_objects) + num_incoming_vehicles) - self.getNumPassengerGroupings()
-

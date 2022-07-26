@@ -104,17 +104,20 @@ class Vehicle:
     def depart(self, curr_time_in_sec):
         self.enroute = True
         self.departure_vehicle_occupancy.append(self.num_passengers)
+        msg = "Vehicle ID: {}".format(self.id)
+        if self.num_passengers == 0:
+            msg += "\nRepositioning to Kiosk #{}".format(self.curr_trip[0].getID())
+        else:
+            msg += "\nCarrying {} passenger(s)\nDropping off:".format(self.num_passengers)
+            for pax in self.lst_passengers:
+                msg += "\nPax {} to Kiosk #{}".format(pax.getPersonID(), pax.getDKiosk().getID())
+        msg += "\nTrip Duration: {}min\nTrip Distance: {}mi".format(round(self.trip_duration/60, 1), round(self.trip_distance/1609.34, 1))
         self.trips.append({
             "id": self.id,
             "num_passengers": self.num_passengers,
             "lnglats": [[lng, lat] for lat, lng in self.lst_leg_latlngs[0]],
             "timestamps": self.lst_leg_timestamps[0],
-            "passengers": [str(pax) for pax in self.lst_passengers],
-            "destinations": [str(kiosk) for kiosk in self.curr_trip],
-            "trip_duration": self.trip_duration,
-            "trip_distance": self.trip_distance,
-            "lst_leg_latlngs": self.lst_leg_latlngs,
-            "lst_leg_durations": self.lst_leg_durations
+            "msg": msg,
         })
 
 

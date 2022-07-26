@@ -23,7 +23,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
-  <link rel="stylesheet" href="http://code.ionicframework.com/ionicons/1.5.2/css/ionicons.min.css">
+  <link rel="stylesheet" href="http://code.ionicframework.com/ionicons/1.5.2/css/ionicons.min.css"/>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css" integrity="sha256-XzD3RpaHPv7lzX9qt+2n1j5cWj48O24KsgaGYpKN8x8=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw-src.css" integrity="sha256-JBlDzNUHnqsTarTjdS7g5qm7Q/Kpxizyp6TBnz2NAhI=" crossorigin="anonymous">
+
+  <link rel="stylesheet" href="/static/assets/css/leaflet.photon.css"/>
 
   <style>
     html,
@@ -35,14 +40,6 @@
       height: 100vh;
       width: 100vw;
       position: absolute;
-    }
-
-    #exampleModalCenter {
-      height: 100vh;
-      width: 100vw;
-      position: absolute;
-      background-color: rgba(255, 255, 255, 0.9);
-      z-index: 2000;
     }
 
     #kiosks {
@@ -295,11 +292,19 @@
         <input type="checkbox" name="avoidLocationsCheckbox" id="avoidLocationsCheckbox">
         <label for="avoidLocationsCheckbox">Add Locations to Avoid</label>
       </div> -->
+      <div class="my-custom-scrollbar" id="regions">
+        <div class="panel-heading">Regions:</div>
+      </div>
+
+      <button type="button" class="btn btn-primary" onclick="getAutoKiosks()">Auto Generate Kiosks</button>
+
       <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#showPromptNewKioskModal">Add Kiosk</button>
       <!-- <button type="button" class="btn btn-info" data-toggle="modal" data-target="#showPromptNewPOIModal">Add POI</button> -->
 
-      <div class="my-custom-scrollbar" id="listkiosks">
+      <div class="my-custom-scrollbar">
         <div class="panel-heading">List of Kiosks:</div>
+        <div id="listkiosks">
+        </div>
       </div>
       <div id="routenetwork">
         <!-- Number of road miles to map: <span id="num_road_miles"></span> <br>
@@ -312,12 +317,12 @@
       <!-- <div id="connectKiosksDiv">
         Marker 1: <span id="connectKiosksDiv_marker1"></span><br />
         Marker 2: <span id="connectKiosksDiv_marker2"></span><br /> --->
-        <button type="button" class="btn btn-info" onclick="getRoute()" id="connect_kiosks_button">Connect Kiosks</button>
       <!-- </div> --->
-
+      <button type="button" class="btn btn-info" onclick="getRoute()" id="connect_kiosks_button">Connect Kiosks</button>
+      <br />
       <div class="btn-group" role="group" aria-label="Button Group">
         <button id="simulate_trips_button" type="button" class="btn btn-primary" data-toggle="modal" data-target="#showSubmitModal" disabled>Simulate Trips</button>
-        <button type="button" class="btn btn-primary" onclick="saveODD()">Save ODD</button>
+        <!-- <button type="button" class="btn btn-primary" onclick="saveODD()">Save ODD</button> -->
         <button type="button" class="btn btn-danger" onclick="resetAll()">Reset All</button>
       </div>
       <div class="loading-icon" id="loading_heatmap_icon">
@@ -345,6 +350,11 @@
   <script src="https://cdn.jsdelivr.net/npm/leaflet-heatmap@1.0.0/leaflet-heatmap.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js" integrity="sha256-siofc4Uwjlra3YWkwthOn8Uj69cNN4aMug/iOHNiRgs=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw-src.js" integrity="sha256-4AeXJ4ZcroXHUXhkzvfLu0Kj8Q91SsATFlOmZvCknlc=" crossorigin="anonymous"></script>
+
+
+  <script src="/static/assets/js/leaflet.photon.js"></script>
   <script>
     function resetAll() {
       window.location.reload();
@@ -357,6 +367,8 @@
     $("#kiosks").hide();
     $("#routenetwork").hide();
     $('#loading_road_network_icon').hide();
+    $('#loading_heatmap_icon').hide();
+    $('#loading_kiosks_icon').hide();
     $('#simulate_trips_button').prop('disabled', true);
     $('#connect_kiosks_button').prop('disabled', true);
 
@@ -365,7 +377,7 @@
     var state_name;
     var feature_geojson_url_path;
     var center_coordinates = {};
-    var bbox;
+    var odd_choice_dir = {{odd_choice_dir}};
 
     var mymap = L.map('map').setView([44.967243, -103.771556], 3);
 
@@ -398,44 +410,135 @@
                       [lat2, lng2]]);
     }
 
-    let jawgPlaces = new JawgPlaces.Leaflet({
-      searchOnTyping: true,
-      adminArea: {
-        outlineColor: 'rgb(172,59,246)',
-        show: true,
-      },
-      marker: {
-        show: false,
-      },
-      sources: 'wof',
-      transition: {
-        type: 'jump',
-      },
-      onClick: (feature) => {
-        $("#kiosks").show();
-        locality_name = feature.properties.locality;
-        county_name = feature.properties.county;
-        state_name = feature.properties.region;
-        center_coordinates["lat"] = feature.geometry.coordinates[1];
-        center_coordinates["lng"] = feature.geometry.coordinates[0];
-        console.log(center_coordinates);
-        bbox = feature.bbox;
-        console.log(bbox);
+    var regionsFeatureGroup = L.featureGroup().addTo(mymap);
 
-        let locality_gid = feature.properties.locality_gid.split(":")[2];
-        feature_geojson_url_path = locality_gid.match(/.{1,3}/g).join("/") + "/" + locality_gid + ".geojson";
+    var regions = {};
+    var regions_osm_geojsons = [];
 
-        fixMapBounds(bbox[1], bbox[0], bbox[3], bbox[2]);
+    function moveToRegion(region_id) {
+      mymap.fitBounds(regions[region_id].getBounds());
+    };
 
-        $("#odd_name").val(locality_name+", "+state_name);
+    function deleteRegion(region_id) {
+      regionsFeatureGroup.removeLayer(regions[region_id]);
+      delete regions[region_id];
+      // Route Network is not up to date, must first connect kiosks before running simulation
+      // Make sure to enable connect kiosks button
+      $("#panel_"+region_id).remove();
+      $('#connect_kiosks_button').prop('disabled', false);
+      // Update the pixel grid
+      drawPixelGrid();
+    };
 
-        drawPixelGrid();
-      },
-      L: L,
-    });
+    function addRegion(response_geojson) {
+      let new_region = L.geoJSON(response_geojson).addTo(regionsFeatureGroup);
+      regions[new_region._leaflet_id] = new_region;
+      regions_osm_geojsons.push(response_geojson["features"][0]);
+      console.log(response_geojson["features"][0]);
+      $("#regions").append('<div class="panel-body" id="panel_'+new_region._leaflet_id+'"><button type="button" class="btn btn-outline-info" onclick="moveToRegion('+new_region._leaflet_id+')">'+response_geojson["features"][0]["properties"]["display_name"]+'</button><button onclick="deleteRegion('+new_region._leaflet_id+')"><i class="fa-solid fa-trash-can fa-lg"></i></button></div>');
+      mymap.fitBounds(regionsFeatureGroup.getBounds());
+      // Update the pixel grid
+      drawPixelGrid();
+    };
+
+    function photonSearchControlHandler(geojson) {
+      $('#kiosks').show();
+      let osm_type = geojson["properties"]["osm_type"];
+      let osm_id = geojson["properties"]["osm_id"];
+
+      request_photon_search_handler = $.ajax({
+        url: 'https://nominatim.openstreetmap.org/lookup?osm_ids=' + osm_type + osm_id + '&polygon_geojson=1&format=geojson',
+        success: addRegion
+      });
+    };
+
+    var photonControlOptions = {
+      placeholder: 'Search for locality...',
+      position: 'topright',
+      includePosition: false,
+      onSelected: photonSearchControlHandler,
+      feedbackEmail: null,
+    }
+
+    var searchControl = new L.Control.Photon(photonControlOptions);
+    searchControl.addTo(mymap);
+
+    // FeatureGroup is to store editable layers
+     var drawnItems = new L.FeatureGroup();
+     mymap.addLayer(drawnItems);
+     var drawControl = new L.Control.Draw({
+        position: 'topright',
+        draw: {
+             polyline: false,
+             circle: false,
+             marker: false,
+             circlemarker: false
+        },
+        edit: {
+           featureGroup: drawnItems
+        }
+     });
+     mymap.addControl(drawControl);
+
+     mymap.on(L.Draw.Event.CREATED, function (e) {
+      var layer = e.layer;
+      console.log(layer.toGeoJSON());
+      regions_osm_geojsons.push(layer.toGeoJSON());
+      drawnItems.addLayer(layer);
+      // Update the pixel grid
+      drawPixelGrid();
+     });
+
+     mymap.on('draw:edited', function (e) {
+      // Update the pixel grid
+      drawPixelGrid();
+     });
+
+     mymap.on('draw:deleted', function (e) {
+       // Update the pixel grid
+       drawPixelGrid();
+     });
+
+    // let jawgPlaces = new JawgPlaces.Leaflet({
+    //   searchOnTyping: true,
+    //   adminArea: {
+    //     outlineColor: 'rgb(172,59,246)',
+    //     show: true,
+    //   },
+    //   marker: {
+    //     show: false,
+    //   },
+    //   sources: 'wof',
+    //   transition: {
+    //     type: 'jump',
+    //   },
+    //   onClick: (feature) => {
+    //     $("#kiosks").show();
+    //     console.log(feature);
+    //     locality_name = feature.properties.locality;
+    //     county_name = feature.properties.county;
+    //     state_name = feature.properties.region;
+    //     center_coordinates["lat"] = feature.geometry.coordinates[1];
+    //     center_coordinates["lng"] = feature.geometry.coordinates[0];
+    //     console.log(center_coordinates);
+    //     bbox = feature.bbox;
+    //     console.log(bbox);
+    //     console.log(feature.properties.locality_gid);
+    //
+    //     let locality_gid = feature.properties.locality_gid.split(":")[2];
+    //     feature_geojson_url_path = locality_gid.match(/.{1,3}/g).join("/") + "/" + locality_gid + ".geojson";
+    //
+    //     fixMapBounds(bbox[1], bbox[0], bbox[3], bbox[2]);
+    //
+    //     $("#odd_name").val(locality_name+", "+state_name);
+    //
+    //     drawPixelGrid();
+    //   },
+    //   L: L,
+    // });
 
 
-    mymap.addControl(jawgPlaces);
+    //mymap.addControl(jawgPlaces);
 
     var markers = {};
     var circles = {};
@@ -621,7 +724,8 @@
         color: 'red',
         fillColor: '#f03',
         fillOpacity: 0.3,
-        radius: 402.336 // 0.25 miles in meters
+        radius: 402.336, // 0.25 miles in meters
+        interactive: false
       }).addTo(circleLayerGroup);
       circles[marker._leaflet_id] = circle;
 
@@ -880,59 +984,31 @@
       }
     }
 
-    function drawPrecalculatedKiosksSuccess(response) {
-      $('#loading_kiosks_icon').hide();
-      console.log(response);
-      var arrayLength = response["lst_marker_latlngs"].length;
-      for (var i = 0; i < arrayLength; i++) {
-        latlng = response["lst_marker_latlngs"][i];
-        placeKiosk(false, "unknown", latlng[0], latlng[1]);
-      }
-    }
-
-    function drawPrecalculatedKiosks() {
-      console.log(feature_geojson_url_path);
-
-      var submitData = {
-        "south": bbox[1],
-        "west": bbox[0],
-        "north": bbox[3],
-        "east": bbox[2],
-        "feature_geojson_url_path": feature_geojson_url_path,
-      }
-
-      request_draw_precalculated_kiosks = $.ajax(
-        {
-          url: '/draw_precalculated_kiosks',
-          data: submitData,
-          dataType: 'json',
-          success: drawPrecalculatedKiosksSuccess
-        }
-      );
-    }
-
-
     function drawPixelGridHandler(response) {
+      pixelGridFeatureGroup.clearLayers();
       L.geoJSON(response["pixel_grid_geojson"], {
           style: function (feature) {
               return {
                 weight: 1,
-                opacity: 0.5,
-                interactive: false
+                opacity: 0.5
               };
           }
-      }).addTo(mymap);
-      extractPersonTrips();
+      }).addTo(pixelGridFeatureGroup);
     }
 
+
+    var pixelGridFeatureGroup = L.featureGroup().addTo(mymap);
     function drawPixelGrid() {
-      let map_bounds = mymap.getBounds();
+      var combined_bounds = L.latLngBounds(regionsFeatureGroup.getBounds());
+      combined_bounds.extend(drawnItems.getBounds());
+
+      console.log(combined_bounds);
 
       var submitData = {
-        "north": map_bounds.getNorth(),
-        "south": map_bounds.getSouth(),
-        "east": map_bounds.getEast(),
-        "west": map_bounds.getWest(),
+        "north": combined_bounds.getNorth(),
+        "south": combined_bounds.getSouth(),
+        "east": combined_bounds.getEast(),
+        "west": combined_bounds.getWest(),
       }
 
       request_draw_pixel_grid = $.ajax({
@@ -943,30 +1019,112 @@
       });
     }
 
-    function extractPersonTripsSuccess(response) {
-      $('#numTripsInKioskNetwork').text(response["numTripsInKioskNetwork"]);
-      getHeatmap();
-      drawPrecalculatedKiosks();
+    function getAutoKiosks() {
+      extractFiles();
     }
 
-    function extractPersonTrips() {
+    function drawAutoKiosksHandler(response) {
+      $('#loading_kiosks_icon').hide();
+      console.log(response);
+      markers = {};
+      markerLayerGroup.clearLayers();
+      circles = {};
+      circleLayerGroup.clearLayers();
+      kiosks = {};
+      // Route Network is not up to date, must first connect kiosks before running simulation
+      // Make sure to enable connect kiosks button
+      $('#simulate_trips_button').prop('disabled', true);
+      $('#connect_kiosks_button').prop('disabled', false);
+
+      var arrayLength = response["lst_marker_latlngs"].length;
+      for (var i = 0; i < arrayLength; i++) {
+        let latlng = response["lst_marker_latlngs"][i];
+        placeKiosk(false, "unknown", latlng[0], latlng[1]);
+      }
+      setPixelPopup(response["dict_pixel_info"]);
+      //getHeatmap(response["dict_pixel_info"]);
+    }
+
+    function drawAutoKiosks() {
+      var combined_bounds = L.latLngBounds(regionsFeatureGroup.getBounds());
+      combined_bounds.extend(drawnItems.getBounds());
 
       var submitData = {
-        "county_name": county_name,
-        "state_name": state_name,
+        "north": combined_bounds.getNorth(),
+        "south": combined_bounds.getSouth(),
+        "east": combined_bounds.getEast(),
+        "west": combined_bounds.getWest(),
+        "regions_osm_geojsons": regions_osm_geojsons,
       }
 
-      request_person_trips_extract = $.ajax(
+      request_draw_precalculated_kiosks = $.ajax(
         {
-          url: "/extract_person_trip_files",
-          data: submitData,
+          type: "POST",
+          url: "/draw_precalculated_kiosks",
+          data: JSON.stringify(submitData),
+          contentType: "application/json",
           dataType: 'json',
-          success: extractPersonTripsSuccess
+          success: drawAutoKiosksHandler
         }
       );
     }
 
-    function getHeatmap() {
+
+    function extractFilesHandler(response) {
+      drawAutoKiosks();
+    }
+
+    function extractFiles() {
+      var lst_county_state = [];
+      for (const geojson of regions_osm_geojsons) {
+        if ("address" in geojson["properties"]) {
+          var addr = geojson["properties"]["address"];
+          lst_county_state.push([addr["county"], addr["state"]]);
+        }
+      }
+      console.log(lst_county_state);
+
+      var submitData = {
+        "lst_county_state": lst_county_state,
+      }
+
+      request_person_trips_extract = $.ajax(
+        {
+          type: "POST",
+          url: "/extract_files",
+          data: JSON.stringify(submitData),
+          contentType: "application/json",
+          dataType: 'json',
+          success: extractFilesHandler
+        }
+      );
+    };
+
+    function setPixelPopup(dict_pixel_info) {
+      pixelGridFeatureGroup.eachLayer(function (layer) {
+        layer.eachLayer(function (inside_layer) {
+          let xcoord = inside_layer.feature.properties.x_coord;
+          let ycoord = inside_layer.feature.properties.y_coord;
+          let key = "("+xcoord+", "+ycoord+")";
+          if (key in dict_pixel_info) {
+            let sumOTrips = dict_pixel_info[key]["sumOTrips"];
+            let sumDTrips = dict_pixel_info[key]["sumDTrips"];
+            console.log([sumOTrips, sumDTrips]);
+            inside_layer.bindTooltip("Pixel: " + xcoord + ", " + ycoord + "<br/>Sum OTrips: " + sumOTrips + "<br/>Sum DTrips: " + sumDTrips, {
+              sticky: true
+            });
+            inside_layer.setStyle({
+              color: 'orange',
+            });
+          }
+        });
+      });
+    }
+
+    function getHeatmap(dict_pixel_info) {
+      var submitData = {
+        "dict_pixel_info": dict_pixel_info
+      }
       request_heatmap = $.ajax(
         {
           type: 'GET',
@@ -983,7 +1141,7 @@
     });
 
     function submitKiosksHandler(response) {
-      $('#submitModalBody').html("<p>Runtime: "+ response['runtime'] +" seconds</p><br />Proceed to <a href='/animation'>animation</a>");
+      $('#submitModalBody').html("<p>Runtime: "+ response['runtime'].toFixed(1) +" seconds</p><br />Proceed to <a href='/animation?odd_choice="+response['odd_choice']+"'>animation</a>");
     }
 
     function submitKiosks() {
@@ -997,11 +1155,21 @@
         lst_marker_latlngs.push([latlng.lat, latlng.lng]);
       };
 
+      var combined_bounds = L.latLngBounds(regionsFeatureGroup.getBounds());
+      combined_bounds.extend(drawnItems.getBounds());
+
+      let center_coordinates_lat = (combined_bounds.getNorth() + combined_bounds.getSouth())/2;
+
+      let center_coordinates_lng = (combined_bounds.getEast() + combined_bounds.getWest())/2;
+
+      center_coordinates["lat"] = center_coordinates_lat;
+      center_coordinates["lng"] = center_coordinates_lng;
+
+      saveODD();
+
       var polylinesGeoJSON = polylineLayerGroup.toGeoJSON();
       var submitData = {
-        // "city_name": locality_name,
-        // "county_name": county_name,
-        // "state_name": state_name,
+        "odd_choice_dir": odd_choice_dir,
         "center_coordinates": center_coordinates,
         "kiosks_dict": kiosks,
         "routes_dict": routes_dict,
@@ -1026,7 +1194,7 @@
     }
 
     function saveODDHandler(response) {
-      alert(response['message']);
+      console.log(response['message']);
     }
 
     var request_save_ODD = null;
@@ -1036,12 +1204,22 @@
       var circlesGeoJSON = circleLayerGroup.toGeoJSON();
       var polylinesGeoJSON = polylineLayerGroup.toGeoJSON();
 
-      var submitData = {
-        "odd_name": locality_name+", "+state_name,
+
+      var setup_interactive_dict = {
         "avoidLocationsGeoJSON": avoidLocationsGeoJSON,
         "markersGeoJSON": markersGeoJSON,
         "circlesGeoJSON": circlesGeoJSON,
-        "polylinesGeoJSON": polylinesGeoJSON
+        "polylinesGeoJSON": polylinesGeoJSON,
+      }
+
+      var meta_data_dict = {
+        "ODD_name": $("#odd_name").val(),
+      }
+
+      var submitData = {
+        "odd_choice_dir": odd_choice_dir,
+        "setup_interactive_dict": setup_interactive_dict,
+        "meta_data_dict": meta_data_dict
       }
 
       request_save_ODD = $.ajax({
@@ -1054,11 +1232,42 @@
       });
     }
 
-    // mymap.on('click', addLocationsToAvoid);
+    // function loadODDHandler(response) {
+    //   console.log(response["markersGeoJSON"]);
+    //   if (response["status"] == "FOUND") {
+    //     var avoidLocationsGeoJSON = L.geoJSON(response["avoidLocationsGeoJSON"]).addTo(mymap);
+    //     for (let idx in response["markersGeoJSON"]["features"]) {
+    //       let feature = response["markersGeoJSON"]["features"][idx];
+    //       console.log(feature);
+    //       let lnglat = feature["geometry"]["coordinates"];
+    //       placeKiosk(false, "unknown", lnglat[1], lnglat[0]);
+    //     }
+    //   };
+    // }
+
+    // function loadODD() {
+    //   var submitData = {
+    //     "odd_choice_dir": odd_choice_dir,
+    //   }
+    //   console.log("SENDING REQUEST");
+    //
+    //   request_load_data = $.ajax({
+    //     url: "/load_odd",
+    //     data: submitData,
+    //     dataType: 'json',
+    //     success: loadODDHandler
+    //   });
+    // }
 
     mymap.zoomControl.setPosition('bottomright');
 
     L.control.scale().addTo(mymap);
+
+    function onMapLoad() {
+      return;
+    }
+
+    mymap.whenReady(onMapLoad);
 
   </script>
 </body>

@@ -1,0 +1,50 @@
+<div class="modal fade" id="showSubmitModal" tabindex="-1" role="dialog" aria-labelledby="showSubmitModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Create Simulation</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" id="submitModalBody">
+        <div class="form-group">
+        <form id="createAnimationForm">
+            <label for="odd_name">ODD Name</label>
+            <input id="odd_name" type="text" name="odd_name" required></input>
+            <br />
+
+            <label for="fleetsize">Fleetsize</label>
+            <input id="fleetsize" type="text" name="fleetsize" value="100" required></input>
+            <br />
+
+            <label for="modesplit">Modesplit (%)</label>
+            <input id="modesplit" type="number" name="modesplit" step="any" value="10" min="0" max="100" required></input>
+            <small class="form-text text-muted">Randomly chooses X% of trips to serve using this network.</small>
+            <br />
+
+            <label for="pax_waittime_threshold">Passenger Waittime Threshold (seconds)</label>
+            <input id="pax_waittime_threshold" type="number" name="pax_waittime_threshold" value="300" required></input>
+            <small class="form-text text-muted">Amount of time passengers wait before they leave.</small>
+            <br />
+
+            <label for="max_circuity">Max Circuity (%)</label>
+            <input id="max_circuity" type="number" name="max_circuity" step="any" value="20" min="0" max="100" required></input>
+            <small class="form-text text-muted">Amount of additional travel time passengers are willing to tolerate in carpooling.</small>
+            <br />
+
+            <label for="max_capacity">Max Vehicle Capacity</label>
+            <input id="max_capacity" type="number" name="max_capacity" step="1" value="4" min="0" max="20" disabled></input>
+            <small class="form-text text-muted">Number of seats in vehicle.</small>
+            <br />
+
+          <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

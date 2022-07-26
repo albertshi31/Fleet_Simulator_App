@@ -166,3 +166,7 @@ path = constructPath(0, 0, graph, Next)
 printPath(path)
 
 # This code is contributed by mohit kumar 29
+
+import addfips
+af = addfips.AddFIPS()
+print(af.get_county_fips('Pinal County', state='Arizona'))

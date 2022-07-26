@@ -184,7 +184,7 @@ function App({
       characterSet: ['\ue559', '\ue7fd', '\uf233', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '\n'],
       getPosition: d => d.c,
       getText: d => d.n + '\n' + d.v.toLocaleString() + '\ue559 ' + d.p.toLocaleString() + '\ue7fd ' + d.g.toLocaleString() + '\uf233',
-      getSize: 10,
+      getSize: 15,
       getAngle: 0,
       getTextAnchor: 'middle',
       getAlignmentBaseline: 'top',
@@ -220,7 +220,7 @@ function App({
 
   return (
     <div>
-    <div id="topright" style={{position: 'absolute', bottom: '10px', right: '0', zIndex: '1'}}>
+    <div id="car_occupancy" style={{position: 'absolute', bottom: '10px', right: '0', zIndex: '1'}}>
       <div class='my-legend'>
         <div class='legend-title'>Car Occupancy</div>
         <div class='legend-scale'>
@@ -322,7 +322,7 @@ function App({
     <button onClick={() => {setAnimationSpeed(prevAnimationSpeed);}}>
         <i class="fa fa-play" />
     </button>
-    <button onClick={() => {setPrevAnimationSpeed(animationSpeed); setAnimationSpeed(0);}}>
+    <button id="stop_animation_button" onClick={() => {setPrevAnimationSpeed(animationSpeed); setAnimationSpeed(0);}}>
         <i class="fa fa-stop" />
     </button>
     <button onClick={() => {setTime((time+1) % loopLength);}}>

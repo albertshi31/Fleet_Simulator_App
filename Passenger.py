@@ -37,6 +37,9 @@ class Passenger:
     def setDKiosk(self, kiosk):
         self.dest_kiosk = kiosk
 
+    def getDKiosk(self):
+        return self.dest_kiosk
+
     def setMissed(self, curr_time_in_sec):
         self.missed = True
         self.waittime = curr_time_in_sec - self.odeparturetime
@@ -75,3 +78,6 @@ class Passenger:
 
     def getDepartureTime(self):
         return self.odeparturetime
+
+    def getPersonID(self):
+        return self.personID

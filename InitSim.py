@@ -2,7 +2,7 @@ import json
 from Dispatcher import Dispatcher
 from Passenger import Passenger
 from Kiosk import Kiosk
-from helper_functions import create_pixel_grid, latlng_to_xypixel, xypixel_to_latlng, get_locations_precalculated_kiosks
+from helper_functions import latlng_to_xypixel
 import pandas as pd
 import time
 from random import random
