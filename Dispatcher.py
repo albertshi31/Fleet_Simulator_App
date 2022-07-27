@@ -83,6 +83,7 @@ class Dispatcher:
         lst_leg_distances = []
         lst_leg_latlngs = []
         lst_leg_timestamps = []
+        lst_leg_timelengths = []
 
         for pax in passengers:
             if pax.dest_kiosk not in remaining_dests:
@@ -106,7 +107,10 @@ class Dispatcher:
                 currlatlngs = matrix_data["latlngs"]
                 latlngs.append(currlatlngs)
 
-                currtimestamps = matrix_data["timestamps"]
+                starting_timestamp = 0
+                if (len(timestamps) != 0):
+                    starting_timestamp = timestamps[len(timestamps)-1][len(timestamps[len(timestamps)-1])-1]
+                currtimestamps = [x + starting_timestamp for x in matrix_data["timestamps"]]
                 timestamps.append(currtimestamps)
 
             idx = np.argmin(durations)
@@ -118,9 +122,16 @@ class Dispatcher:
             lst_leg_durations.append(durations[idx])
             lst_leg_distances.append(distances[idx])
             lst_leg_latlngs.append(latlngs[idx])
-            lst_leg_timestamps.append([x+curr_time_in_sec for x in matrix_data["timestamps"]])
+            lst_leg_timelengths.append(timestamps[idx])
 
+        for i in range(len(lst_leg_timelengths)):
+            if (i != 0):
+                lst_leg_timestamps.append([x+lst_leg_timestamps[i-1][len(lst_leg_timelengths[i-1])-1] for x in lst_leg_timelengths[i]])
+            else:
+                lst_leg_timestamps.append([x+curr_time_in_sec for x in lst_leg_timelengths[0]])
         assert len(ret_list) == len(lst_leg_latlngs), "All lists should have the same length"
+        if (len(lst_leg_timestamps)>= 2):
+            assert lst_leg_timestamps[0][0] < lst_leg_timestamps[1][0], "Trips should start after each other"
         curr_trip = ret_list
         return passengers, curr_trip, len(passengers), trip_duration, trip_distance, lst_leg_durations, lst_leg_distances, lst_leg_latlngs, lst_leg_timestamps
 
@@ -385,6 +396,8 @@ class Dispatcher:
                     vehicle.removeTripLeg()
                     # Get the passengers that the vehicle is dropping off at this new kiosk
                     lst_dropped_off_passengers = vehicle.getDroppedOffPassengers()
+                    if (len(lst_dropped_off_passengers)!= 0):
+                        assert lst_dropped_off_passengers[len(lst_dropped_off_passengers)-1].dest_kiosk == new_kiosk, "All passengers should be dropped off at final destination"
                     # Remove dropped off passengers from the vehicle passenger list
                     vehicle.removePassengers(lst_dropped_off_passengers)
                     # Add dropped off passengers as arriving passengers to the new kiosk (used for tracking purposes)
