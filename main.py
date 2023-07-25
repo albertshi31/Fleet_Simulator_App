@@ -513,11 +513,16 @@ def getCompleteRoutesMatrix(lst_latlngs, routes_dict):
             return_complete_route_matrix['{};{}'.format(str_lst_latlngs[i], str_lst_latlngs[j])] = getRouteDictFromPath(path, lst_latlngs, str_lst_latlngs, routes_dict)
     return return_complete_route_matrix
 
-
+"""
+Function attempts to augment an ODD but code is not working as intended.
+Inserting an error message does not run at all
+Need to look at each input/parameter for Dispatcher 
+"""
 @app.route("/create_simulation", methods=['POST'])
 def prepare_simulation():
     received_data = request.get_json()
-
+    with open('received_data.txt', 'w') as test_file:
+        test_file.write(json.dumps(received_data))
     odd_choice_dir = received_data['odd_choice_dir']
     center_coordinates = received_data['center_coordinates']
     kiosks_dict = received_data['kiosks_dict']
@@ -530,6 +535,7 @@ def prepare_simulation():
     polylinesGeoJSON = received_data['polylinesGeoJSON']
     TIME_STEP = 10
 
+    # Initialize a bunch of lists and append kiosks, pixels, etc.
     lst_vehicle = []
     lst_kiosk_pixels = []
     lst_kiosk = []
@@ -544,6 +550,8 @@ def prepare_simulation():
         lst_kiosk_dict_animation.append({'coordinates': [lng, lat], 'msg': str(new_kiosk)})
         kiosk_id += 1
 
+    # Creates passenger object for each row in a PersonTrip file (not present in the code, data may have been extracted locally)
+    # Reads columns of data file --> takes all trips within a kiosk pixels and if the person actually went somewhere (destination coordinates are different from the origin coordinates) --> extend into the current passenger list
     lst_all_passengers_within_ODD = []
     for filename in list_of_unzipped_files:
         df = pd.read_csv("local_static/" + filename)
@@ -554,6 +562,7 @@ def prepare_simulation():
     df_departure_times = pd.DataFrame([pax.getDepartureTime() for pax in lst_all_passengers_within_ODD], columns=["DepartureTime"])
     print("Num Pax", len(lst_all_passengers_within_ODD))
 
+    # Some modesplit stuff
     bins = range(0, max(df_departure_times['DepartureTime'])+TIME_STEP, TIME_STEP)
     times = pd.Series(df_departure_times['DepartureTime'])
     groups = pd.cut(times, bins=bins)
@@ -574,6 +583,7 @@ def prepare_simulation():
         if random() <= modesplit:
             lst_all_passengers.append(pax)
 
+    # Sort all passengers by departure time from origin
     lst_all_passengers.sort(key=lambda pax:pax.odeparturetime)
 
     # get the start datetime
@@ -592,6 +602,7 @@ def prepare_simulation():
     kiosk_metrics = dispatcher.getKioskTimeframeMetrics()
     looplength = dispatcher.getFinalTimeInSec()
 
+    # Creates a dictionary for all of the metrics
     animation_data_file_dict = {
         "center_coordinates": center_coordinates,
         "TIME_STEP": TIME_STEP,
@@ -604,6 +615,7 @@ def prepare_simulation():
         "looplength": looplength,
     }
 
+    # Creates the animation data file that is used to run the simulation
     with open(os.path.join("user_data", str(odd_choice_dir), "animation_data_file.json"), "w") as f:
         json.dump(animation_data_file_dict, f)
 
@@ -616,14 +628,18 @@ def prepare_simulation():
     }
     return response
 
+# This visualizer is all pre-computed, and it just runs an animation whenever you run main.py
+# This is not actually computing anything in realtime (the data and numbers are the same each time)
+# All of the data is taken from animation_data_file.json, which is created above by Dispatcher
 @app.route("/animation")
 def animation():
+    # raise Exception("intended error")
     odd_choice_dir = request.args.get("odd_choice")
 
     with open(os.path.join("user_data", str(odd_choice_dir), "animation_data_file.json"), "r") as f:
         animation_data_file_dict = json.load(f)
 
-    # Retrieve all values from the data file
+    # Retrieve all values from the data file (created by dispatcher)
     center_coordinates = animation_data_file_dict['center_coordinates']
     TIME_STEP = animation_data_file_dict['TIME_STEP']
     trips = animation_data_file_dict['trips']
@@ -634,6 +650,7 @@ def animation():
     road_network = animation_data_file_dict['road_network']
     looplength = animation_data_file_dict['looplength']
 
+    # Display the animation template
     html = render_template("index.html",
                             center_coordinates=center_coordinates,
                             time_step=TIME_STEP,
