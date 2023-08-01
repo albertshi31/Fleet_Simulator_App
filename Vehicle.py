@@ -22,6 +22,7 @@ class Vehicle:
         self.lst_leg_latlngs = []
         self.lst_leg_timestamps = []
         self.enroute = False
+        self.tripsCompleted = 0
 
         # Animation data
         self.trips = []
@@ -71,6 +72,7 @@ class Vehicle:
     def removeTripLeg(self):
         self.total_distance_traveled += self.lst_leg_distances[0]
         self.total_duration_traveled += self.lst_leg_durations[0]
+        self.tripsCompleted += 1
         if self.num_passengers == 0:
             self.total_empty_distance_traveled += self.lst_leg_distances[0]
             self.total_empty_duration_traveled += self.lst_leg_durations[0]
@@ -101,6 +103,7 @@ class Vehicle:
         self.lst_leg_latlngs = []
         self.lst_leg_timestamps = []
 
+    # This is where the overlay popup info for the vehicles comes from
     def depart(self, curr_time_in_sec):
         self.enroute = True
         self.departure_vehicle_occupancy.append(self.num_passengers)
@@ -108,10 +111,11 @@ class Vehicle:
         if self.num_passengers == 0:
             msg += "\nRepositioning to Kiosk #{}".format(self.curr_trip[0].getID())
         else:
-            msg += "\nCarrying {} passenger(s)\nDropping off:".format(self.num_passengers)
+            msg += "\nComing From Kiosk #{}\nDropping off:".format(self.kiosk.getID())
             for pax in self.lst_passengers:
-                msg += "\nPax {} to Kiosk #{}".format(pax.getPersonID(), pax.getDKiosk().getID())
+                msg += "\nPax at Kiosk {}, waittime {}s".format(pax.getDKiosk().getID(), pax.getWaittime())
         msg += "\nTrip Duration: {}min\nTrip Distance: {}mi".format(round(self.trip_duration/60, 1), round(self.trip_distance/1609.34, 1))
+        msg += "\nTrips Completed So Far: {}".format(self.getTripsCompleted())
         self.trips.append({
             "id": self.id,
             "num_passengers": self.num_passengers,
@@ -149,6 +153,9 @@ class Vehicle:
 
     def getTrips(self):
         return self.trips
+
+    def getTripsCompleted(self):
+        return self.tripsCompleted
 
     def getDVO(self):
         return self.departure_vehicle_occupancy
