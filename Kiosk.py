@@ -16,13 +16,16 @@ class Kiosk:
         self.dict_lst_lsts_passenger_groupings = {} # The key should be the latest that the group can depart without anyone leaving
         self.lst_missed_passenger_objects = []
         self.net_vehicle_balance = 0
+        self.num_passengers_served = 0
 
         # History data
         self.lst_all_departing_passengers = [] # Remembers all passengers that departed from this kiosk
         self.lst_all_arriving_passengers = [] # Remembers all passengers that arrived to this kiosk
 
-    def __str__(self):
-        return "Name: {}\nLat, Lng: ({}, {})\nPixel Coordinates: ({}, {})\n".format(self.name, self.lat, self.lng, self.xcoord, self.ycoord)
+    # This is where the overlay popup info for the vehicles comes from, the # Pax Served: {} is always 0 though
+    # The __str__ is run in main at the very start, when the kiosks are first initialized, not while the simulation is running
+    def __str__(self): 
+        return "Name: {}\nLat, Lng: ({}, {})\nPixel Coordinates: ({}, {})\n# Pax Served: {}".format(self.name, self.lat, self.lng, self.xcoord, self.ycoord, self.getNumberPassengersServed())
 
     def printState(self):
         ret_str = "Name: {}\nLat, Lng: ({}, {})\nWaiting Passengers: {}\nVehicles: {}\nIncoming Vehicles: {}\nPax Groups: {}\nArrived Pax: {}"\
@@ -43,6 +46,9 @@ class Kiosk:
 
     def getXYPixelCoords(self):
         return (self.xcoord, self.ycoord)
+
+    def getNumberPassengersServed(self):
+        return self.num_passengers_served
 
     def addVehicle(self, vehicle_object):
         self.lst_vehicle_objects.append(vehicle_object)
@@ -68,6 +74,7 @@ class Kiosk:
         return []
 
     def addDepartingPassenger(self, passenger_object):
+        self.num_passengers_served += 1
         self.lst_passenger_objects.append(passenger_object)
         self.lst_all_departing_passengers.append(passenger_object)
 
@@ -147,12 +154,12 @@ class Kiosk:
     def getNetVehicleBalance(self):
         return self.net_vehicle_balance
 
+    # This is where all of the missed passengers are counted
+    # Doesn't update at runtime though, so we can't use getWaittime since it's type: None right now
     def removeMissedPassengers(self, curr_time_in_sec, passenger_waittime_threshold):
         ret_lst_missed_passengers = []
-        idx = 0
-        for idx, pax in enumerate(self.lst_passenger_objects):
-            missed_time = pax.odeparturetime + passenger_waittime_threshold
-            if missed_time < curr_time_in_sec:
+        for pax in self.lst_passenger_objects:
+            if curr_time_in_sec - pax.odeparturetime >= passenger_waittime_threshold:
                 ret_lst_missed_passengers.append(pax)
             else:
                 break
@@ -186,6 +193,7 @@ class Kiosk:
         # Look at all passenger groups and see if any of their members waited equal to or more than the threshold
         for key, lst_lsts_passenger_groupings in self.dict_lst_lsts_passenger_groupings.items():
             return_lst_of_lsts_of_passenger_groupings.extend(lst_lsts_passenger_groupings)
+        return return_lst_of_lsts_of_passenger_groupings
 
         return return_lst_of_lsts_of_passenger_groupings
     def getTotalVehicleBalance(self):

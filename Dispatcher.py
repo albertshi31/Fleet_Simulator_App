@@ -251,13 +251,20 @@ class Dispatcher:
         walk_to_okiosk_dist = []
         walk_to_dkiosk_dist = []
         pax_added_triptime = []
+        count = 0
+        # Initially was not computing right since we would serve passengers that had a waittime above our threshold
+        # If the waittime is less than our set threshold, then we serve the passenger and acquire the data
         for pax in self.lst_all_passenger_objects:
-            if not pax.isMissed():
+            if pax.getWaittime() < self.passenger_waittime_threshold:
+            # if not pax.isMissed():
                 person_alone_trip_length.append(pax.getAloneTripLength())
                 pax_waittime.append(pax.getWaittime())
+                print("here", pax.getWaittime())
                 walk_to_okiosk_dist.append(pax.getWalkToKioskDistance())
                 walk_to_dkiosk_dist.append(pax.getWalkToDestKioskDistance())
                 pax_added_triptime.append(pax.getAddedTriptime())
+            else: 
+                count+=1
 
         self.EOD_metrics["person_alone_trip_length"] = person_alone_trip_length
         self.EOD_metrics["pax_waittime"] = pax_waittime
@@ -276,16 +283,21 @@ class Dispatcher:
         num_total_passengers = 0
         num_served_passengers = 0
         num_missed_passengers = 0
+        # Departed meaning departing from the origin kiosk
+        # Arrived meaning arriving at the destination kiosk
         for kiosk in self.lst_all_kiosk_objects:
             num_total_passengers += len(kiosk.lst_all_arriving_passengers)
-            num_served_passengers += len(kiosk.lst_all_arriving_passengers)
             num_total_passengers += len(kiosk.lst_missed_passenger_objects)
+            num_served_passengers += len(kiosk.lst_all_arriving_passengers)
             num_missed_passengers += len(kiosk.lst_missed_passenger_objects)
         print("Total passengers served:", num_served_passengers)
         print("Missed passengers:", num_missed_passengers)
         print("AVO:", avo)
         print("DVO:", sum(dvo)/len(dvo))
         print("Avg utilization time:",self.EOD_metrics["avg_utilization_time"])
+        print(len(person_alone_trip_length), num_served_passengers)
+        print(len(self.lst_all_passenger_objects))
+        print(count+len(person_alone_trip_length))
         assert num_total_passengers == len(self.lst_all_passenger_objects), "Some passengers are unaccounted for"
         assert len(person_alone_trip_length) == num_served_passengers, "Some served passengers are unaccounted for"
 
@@ -481,6 +493,27 @@ class Dispatcher:
                 # enough incoming and current vehicles to assign a vehicle to each passenger grouping
                 kiosk.updateNetVehicleBalance(self.passenger_waittime_threshold)
 
+
+                # Check if any passengers waited more than passenger_waittime_threshold and make them leave
+                num_missed_passengers = len(kiosk.removeMissedPassengers(curr_time_in_sec, self.passenger_waittime_threshold))
+                
+                #if (num_missed_passengers != 0):
+                #    print(kiosk.name," ",num_missed_passengers," missd passenger(s)")
+                # If there are any missed passengers, then the passenger groupings need to be updated
+
+                # UPDATE: We have to kick passengers out if their waittime is exceeded
+                # Before, the code was making passenger grouping and the car would leave if one of their times were exceeded
+                # Now, we are kicking passengers out if their waittime is exceeded and then recalculating groupings
+                if num_missed_passengers:
+                    sorted_dict_passenger_groups = self.calculatePassengerGroupings({}, # Erase the existing passenger groupings
+                                                                               kiosk.getPassengerObjects(), # Need to regroup all passengers currently at kiosk
+                                                                               kiosk,
+                                                                               self.MAX_CAPACITY)
+                    # Overwrite the existing passenger groupings
+                    kiosk.setPassengerGroupings(sorted_dict_passenger_groups)
+                    # Update the number of vehicles that a kiosk still needs (might be zero since everyone left)
+                    kiosk.updateNetVehicleBalance(self.passenger_waittime_threshold)
+
                 # Kiosk should check if any of its passenger groupings should be assigned a vehicle
                 # There are two possible scenarios:
                 # 1. Length of any passenger grouping equals the MAX_CAPACITY
@@ -526,23 +559,6 @@ class Dispatcher:
                     # Alert the last kiosk on its route that it will arrive there
                     final_kiosk_destination, arrival_time = vehicle.getFinalKioskDestination()
                     final_kiosk_destination.addIncomingVehicle(vehicle, arrival_time)
-
-
-                # Check if any passengers waited more than passenger_waittime_threshold and make them leave
-                num_missed_passengers = len(kiosk.removeMissedPassengers(curr_time_in_sec, self.passenger_waittime_threshold))
-                #if (num_missed_passengers != 0):
-                #    print(kiosk.name," ",num_missed_passengers," missd passenger(s)")
-                # If there are any missed passengers, then the passenger groupings need to be updated
-                if num_missed_passengers:
-                    sorted_dict_passenger_groups = self.calculatePassengerGroupings({}, # Erase the existing passenger groupings
-                                                                               kiosk.getPassengerObjects(), # Need to regroup all passengers currently at kiosk
-                                                                               kiosk,
-                                                                               self.MAX_CAPACITY)
-                    # Overwrite the existing passenger groupings
-                    kiosk.setPassengerGroupings(sorted_dict_passenger_groups)
-                    # Update the number of vehicles that a kiosk still needs (might be zero since everyone left)
-                    kiosk.updateNetVehicleBalance(self.passenger_waittime_threshold)
-
 
                 # Reset the new departing passenger list
                 kiosk.resetNewDepartingPassengerObjects()
